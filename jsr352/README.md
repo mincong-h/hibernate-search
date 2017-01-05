@@ -1,3 +1,5 @@
+[![Build Status][travis-img]][travis]
+
 # gsoc-hsearch
 
 This project aims to provide an alternative to the current mass indexer 
@@ -26,3 +28,5 @@ control (start/stop/restart), logging, checkpointing and parallelization.
 For more information, please check http://mincong-h.github.io/gsoc-hsearch
 
 [1]: https://raw.githubusercontent.com/mincong-h/gsoc-hsearch/master/img/mass-index.png
+[travis]: https://travis-ci.org/mincong-h/gsoc-hsearch
+[travis-img]: https://travis-ci.org/mincong-h/gsoc-hsearch.svg?branch=master
