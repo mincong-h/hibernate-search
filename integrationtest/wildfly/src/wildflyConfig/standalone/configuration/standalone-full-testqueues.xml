@@ -109,7 +109,11 @@
             <logger category="org.hibernate.search">
                 <level name="DEBUG"/>
             </logger>
-            <logger category="sun.rmi">
+            <!-- find out beans.xml error during load -->
+            <logger category="org.jboss.weld.ClassLoading">
+                <level name="DEBUG"/>
+            </logger>
+           <logger category="sun.rmi">
                 <level name="WARN"/>
             </logger>
             <root-logger>
@@ -387,7 +391,8 @@
             <recovery-environment socket-binding="txn-recovery-environment" status-socket-binding="txn-status-manager"/>
 
             <!-- TX timeout of 2 sec is required by MassIndexingTimeoutIT -->
-            <coordinator-environment default-timeout="2"/>
+            <!-- TX timeout of 300 sec is required by the batch job "mass-index" -->
+            <coordinator-environment default-timeout="300"/>
         </subsystem>
         <subsystem xmlns="urn:jboss:domain:undertow:3.0">
             <buffer-cache name="default"/>
