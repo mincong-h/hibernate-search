@@ -32,7 +32,6 @@
         <module>core</module>
         <module>cdi</module>
         <module>documentation</module>
-        <module>integrationtest/performance</module>
     </modules>
 
     <issueManagement>

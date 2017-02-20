@@ -39,6 +39,7 @@
         <module>integrationtest/osgi/karaf-features</module>
         <module>integrationtest/sandbox</module>
         <module>integrationtest/engine-performance</module>
+        <module>integrationtest/jsr352-performance</module>
     </modules>
 
     <issueManagement>
