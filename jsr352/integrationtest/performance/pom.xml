@@ -177,6 +177,7 @@
                                     <overWrite>false</overWrite>
                                     <outputDirectory>${project.build.directory}/node1/wildfly-${wildflyVersion}/modules</outputDirectory>
                                 </artifactItem>
+                                <!-- Provide the current project to WildFly as a new module -->
                                 <artifactItem>
                                     <groupId>org.hibernate</groupId>
                                     <artifactId>hibernate-search-modules</artifactId>
@@ -184,16 +185,6 @@
                                     <classifier>wildfly-10-dist</classifier>
                                     <type>zip</type>
                                     <overWrite>false</overWrite>
-                                    <outputDirectory>${project.build.directory}/node1/wildfly-${wildflyVersion}/modules</outputDirectory>
-                                </artifactItem>
-                                <!-- Provide the current project to WildFly as a new module -->
-                                <artifactItem>
-                                    <groupId>org.hibernate</groupId>
-                                    <artifactId>hibernate-search-jsr352-modules</artifactId>
-                                    <version>${project.version}</version>
-                                    <classifier>wildfly-10-dist</classifier>
-                                    <type>zip</type>
-                                    <overWrite>true</overWrite>
                                     <outputDirectory>${project.build.directory}/node1/wildfly-${wildflyVersion}/modules</outputDirectory>
                                 </artifactItem>
                             </artifactItems>
