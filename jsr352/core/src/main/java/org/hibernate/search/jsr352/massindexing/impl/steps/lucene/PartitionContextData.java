@@ -14,7 +14,7 @@ import org.hibernate.Session;
  * Data model for each partition of step {@code produceLuceneDoc}. It contains a partition-level indexing progress and
  * the session attached to this partition. Notice that the batch runtime maintains one clone per partition and each
  * partition is running on a single thread. Therefore, session is not shared with other threads / partitions.
- * 
+ *
  * @author Gunnar Morling
  * @author Mincong Huang
  */
