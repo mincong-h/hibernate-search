@@ -171,7 +171,7 @@ public class PerformanceIT {
 						.fetchSize( JOB_FETCH_SIZE )
 						.maxThreads( JOB_MAX_THREADS )
 						.rowsPerPartition( JOB_ROWS_PER_PARTITION )
-						.checkpointFreq( JOB_ITEM_COUNT )
+						.checkpointInterval( JOB_ITEM_COUNT )
 						.build()
 				);
 		JobExecution jobExecution = BatchRuntime.getJobOperator().getJobExecution( executionId );
