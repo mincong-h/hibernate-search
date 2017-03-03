@@ -164,12 +164,16 @@ public class PerformanceIT {
 		JobOperator jobOperator = BatchRuntime.getJobOperator();
 
 		// Start the job
-		long executionId = BatchIndexingJob.forEntities( Company.class, Person.class )
-				.fetchSize( JOB_FETCH_SIZE )
-				.maxThreads( JOB_MAX_THREADS )
-				.rowsPerPartition( JOB_ROWS_PER_PARTITION )
-				.checkpointFreq( JOB_ITEM_COUNT )
-				.start();
+		long executionId = jobOperator.start(
+				MassIndexingJob.NAME,
+				MassIndexingJob.parameters()
+						.forEntities( Company.class, Person.class )
+						.fetchSize( JOB_FETCH_SIZE )
+						.maxThreads( JOB_MAX_THREADS )
+						.rowsPerPartition( JOB_ROWS_PER_PARTITION )
+						.checkpointFreq( JOB_ITEM_COUNT )
+						.build()
+				);
 		JobExecution jobExecution = BatchRuntime.getJobOperator().getJobExecution( executionId );
 		jobExecution = JobTestUtil.waitForTermination( jobOperator, jobExecution, JOB_TIMEOUT_MS );
 		assertEquals( BatchStatus.COMPLETED, jobExecution.getBatchStatus() );
