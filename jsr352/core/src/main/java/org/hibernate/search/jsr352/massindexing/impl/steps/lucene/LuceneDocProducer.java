@@ -23,8 +23,10 @@ import org.hibernate.search.engine.integration.impl.ExtendedSearchIntegrator;
 import org.hibernate.search.engine.spi.DocumentBuilderIndexedEntity;
 import org.hibernate.search.engine.spi.EntityIndexBinding;
 import org.hibernate.search.jsr352.logging.impl.Log;
+import org.hibernate.search.jsr352.massindexing.MassIndexingJobParameters;
 import org.hibernate.search.jsr352.massindexing.impl.JobContextData;
 import org.hibernate.search.jsr352.massindexing.impl.util.MassIndexingPartitionProperties;
+import org.hibernate.search.util.StringHelper;
 import org.hibernate.search.util.logging.impl.LoggerFactory;
 
 /**
@@ -43,6 +45,10 @@ public class LuceneDocProducer implements ItemProcessor {
 	@Inject
 	@BatchProperty(name = MassIndexingPartitionProperties.ENTITY_NAME)
 	private String entityName;
+
+	@Inject
+	@BatchProperty(name = MassIndexingJobParameters.TENANT_ID)
+	private String tenantId;
 
 	private EntityManagerFactory emf;
 
@@ -86,12 +92,6 @@ public class LuceneDocProducer implements ItemProcessor {
 	 * @return an addLuceneWork
 	 */
 	private AddLuceneWork buildAddLuceneWork(Object entity, Class<?> entityType) {
-		// TODO: tenant ID should not be null
-		// Or may it be fine to be null? Gunnar's integration test in Hibernate
-		// Search: MassIndexingTimeoutIT does not mention the tenant ID neither
-		// (The tenant ID is not included mass indexer setup in the
-		// ConcertManager)
-		String tenantId = null;
 		ConversionContext conversionContext = new ContextualExceptionBridgeHelper();
 
 		Serializable id = (Serializable) emf.getPersistenceUnitUtil()
@@ -108,7 +108,12 @@ public class LuceneDocProducer implements ItemProcessor {
 		finally {
 			conversionContext.popProperty();
 		}
-		AddLuceneWork addWork = docBuilder.createAddWork(
+		// The default value of job parameter is the empty string "" in JSR-352 batch runtime (Spec 1.0, §8.8.1.5), but
+		// the default value of tenant identifier should be null in Hibernate Search.
+		if ( StringHelper.isEmpty( tenantId ) ) {
+			tenantId = null;
+		}
+		return docBuilder.createAddWork(
 				tenantId,
 				entityType,
 				entity,
@@ -122,6 +127,5 @@ public class LuceneDocProducer implements ItemProcessor {
 				 */
 				null,
 				conversionContext );
-		return addWork;
 	}
 }
