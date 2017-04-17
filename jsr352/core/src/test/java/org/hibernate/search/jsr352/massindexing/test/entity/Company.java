@@ -34,6 +34,7 @@ public class Company implements Serializable {
 	private String name;
 
 	public Company() {
+		// used by Hibernate
 	}
 
 	public Company(String name) {
@@ -60,4 +61,29 @@ public class Company implements Serializable {
 	public String toString() {
 		return "Company [id=" + id + ", name=" + name + "]";
 	}
+
+	@Override
+	public boolean equals(Object o) {
+		if ( this == o ) {
+			return true;
+		}
+		if ( o == null || getClass() != o.getClass() ) {
+			return false;
+		}
+
+		Company company = (Company) o;
+
+		if ( id != company.id ) {
+			return false;
+		}
+		return name != null ? name.equals( company.name ) : company.name == null;
+	}
+
+	@Override
+	public int hashCode() {
+		int result = id;
+		result = 31 * result + ( name != null ? name.hashCode() : 0 );
+		return result;
+	}
+
 }
