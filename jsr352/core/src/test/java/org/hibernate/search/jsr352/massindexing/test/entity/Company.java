@@ -41,6 +41,10 @@ public class Company implements Serializable {
 		this.name = name;
 	}
 
+	public Company(int id) {
+		this( "company-" + id );
+	}
+
 	public int getId() {
 		return id;
 	}

@@ -39,6 +39,10 @@ public class Person {
 		this.famillyName = famillyName;
 	}
 
+	public Person(int id, String firstName, String familyName) {
+		this( "person-" + id, firstName, familyName );
+	}
+
 	public String getId() {
 		return id;
 	}
