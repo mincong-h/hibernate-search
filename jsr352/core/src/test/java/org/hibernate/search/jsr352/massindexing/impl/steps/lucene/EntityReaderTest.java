@@ -6,46 +6,38 @@
  */
 package org.hibernate.search.jsr352.massindexing.impl.steps.lucene;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNull;
-
-import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashSet;
-
 import javax.batch.runtime.context.JobContext;
 import javax.batch.runtime.context.StepContext;
-import javax.persistence.EntityManager;
-import javax.persistence.EntityManagerFactory;
-import javax.persistence.Persistence;
 
-import org.hibernate.search.jsr352.logging.impl.Log;
+import org.hibernate.search.jsr352.massindexing.MassIndexingJobTestBase;
 import org.hibernate.search.jsr352.massindexing.impl.JobContextData;
 import org.hibernate.search.jsr352.massindexing.impl.util.PartitionBound;
 import org.hibernate.search.jsr352.massindexing.test.entity.Company;
-import org.hibernate.search.util.logging.impl.LoggerFactory;
 
 import org.junit.Before;
 import org.junit.Test;
+
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Mockito;
 import org.mockito.MockitoAnnotations;
+
+import static org.fest.assertions.Assertions.assertThat;
 
 /**
  * Unit test for item reader validation.
  *
  * @author Mincong Huang
  */
-public class EntityReaderTest {
+public class EntityReaderTest extends MassIndexingJobTestBase {
 
-	private static final Log log = LoggerFactory.make( Log.class );
-
-	private static final String PERSISTENCE_UNIT_NAME = "h2";
-	private static final Company[] COMPANIES = new Company[]{
+	private static final Company[] COMPANIES = new Company[] {
 			new Company( "Red Hat" ),
 			new Company( "Google" ),
-			new Company( "Microsoft" ) };
-	private EntityManagerFactory emf;
+			new Company( "Microsoft" )
+	};
 
 	@Mock
 	private JobContext mockedJobContext;
@@ -58,65 +50,49 @@ public class EntityReaderTest {
 
 	@Before
 	public void setUp() {
-		EntityManager em = null;
-		try {
-			emf = Persistence.createEntityManagerFactory( PERSISTENCE_UNIT_NAME );
-			em = emf.createEntityManager();
-			em.getTransaction().begin();
-			for ( Company c : COMPANIES ) {
-				em.persist( c );
-			}
-			em.getTransaction().commit();
-		}
-		finally {
-			try {
-				em.close();
-			}
-			catch (Exception e) {
-				log.error( e );
-			}
-		}
+		persist( COMPANIES );
 
-		final String cacheable = String.valueOf( false );
-		final String entityName = Company.class.getName();
-		final String fetchSize = String.valueOf( 1000 );
-		final String hql = null;
-		final String maxResults = String.valueOf( Integer.MAX_VALUE );
-		final String partitionId = String.valueOf( 0 );
-		entityReader = new EntityReader( cacheable,
+		String cacheable = String.valueOf( false );
+		String entityName = Company.class.getName();
+		String fetchSize = String.valueOf( 1000 );
+		String maxResults = String.valueOf( Integer.MAX_VALUE );
+		String partitionId = String.valueOf( 0 );
+		entityReader = new EntityReader(
+				cacheable,
 				entityName,
 				fetchSize,
-				hql,
+				null,
 				maxResults,
-				partitionId );
+				partitionId
+		);
 
 		MockitoAnnotations.initMocks( this );
 	}
 
 	@Test
-	public void testReadItem_withoutBoundary() throws Exception {
+	public void canReadItems() throws Exception {
+		// setup
+		PartitionBound partitionBound = new PartitionBound( Company.class, null, null );
+		Mockito.when( mockedJobContext.getTransientUserData() ).thenReturn( newMockedJobContextData( partitionBound ) );
+		Mockito.doNothing().when( mockedStepContext ).setTransientUserData( Mockito.any() );
 
-		Object upper = null;
-		Object lower = null;
-		PartitionBound partitionBound = new PartitionBound( Company.class, lower, upper );
+		entityReader.open( null );
 
-		// mock job context
+		for ( Company expected : COMPANIES ) {
+			Company actual = (Company) entityReader.readItem();
+			assertThat( actual ).isEqualTo( expected );
+		}
+		// no more item
+		assertThat( entityReader.readItem() ).isNull();
+	}
+
+	private JobContextData newMockedJobContextData(PartitionBound partitionBound) {
 		JobContextData jobData = new JobContextData();
 		jobData.setEntityManagerFactory( emf );
 		jobData.setCustomQueryCriteria( new HashSet<>() );
 		jobData.setEntityTypes( Company.class );
-		jobData.setPartitionBounds( Arrays.asList( partitionBound ) );
-		Mockito.when( mockedJobContext.getTransientUserData() ).thenReturn( jobData );
-
-		// mock step context
-		Mockito.doNothing().when( mockedStepContext ).setTransientUserData( Mockito.any() );
-
-		entityReader.open( null );
-		for ( int i = 0; i < COMPANIES.length; i++ ) {
-			Company c = (Company) entityReader.readItem();
-			assertEquals( COMPANIES[i].getName(), c.getName() );
-		}
-		// no more item
-		assertNull( entityReader.readItem() );
+		jobData.setPartitionBounds( Collections.singletonList( partitionBound ) );
+		return jobData;
 	}
+
 }
