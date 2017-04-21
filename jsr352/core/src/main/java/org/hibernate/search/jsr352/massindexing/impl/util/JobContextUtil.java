@@ -8,6 +8,7 @@ package org.hibernate.search.jsr352.massindexing.impl.util;
 
 import java.io.IOException;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -101,7 +102,11 @@ public final class JobContextUtil {
 				.filter( clz -> entityNamesToIndex.contains( clz.getName() ) )
 				.collect( Collectors.toCollection( HashSet::new ) );
 
-		Set<Criterion> criteria = MassIndexerUtil.deserializeCriteria( serializedCustomQueryCriteria );
+		@SuppressWarnings("unchecked")
+		Set<Criterion> criteria = (Set<Criterion>) SerializationUtil.deserialize( serializedCustomQueryCriteria );
+		if ( criteria == null ) {
+			criteria = Collections.emptySet();
+		}
 		log.criteriaSize( criteria.size() );
 
 		JobContextData jobContextData = new JobContextData();
