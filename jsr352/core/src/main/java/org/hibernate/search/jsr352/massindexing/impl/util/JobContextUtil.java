@@ -14,12 +14,13 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 import javax.batch.runtime.context.JobContext;
-import javax.persistence.EntityManager;
 import javax.persistence.EntityManagerFactory;
 
+import org.hibernate.SessionFactory;
 import org.hibernate.criterion.Criterion;
+import org.hibernate.search.engine.integration.impl.ExtendedSearchIntegrator;
 import org.hibernate.search.exception.AssertionFailure;
-import org.hibernate.search.jpa.Search;
+import org.hibernate.search.hcore.util.impl.ContextHelper;
 import org.hibernate.search.jsr352.context.jpa.EntityManagerFactoryRegistry;
 import org.hibernate.search.jsr352.context.jpa.impl.ActiveSessionFactoryRegistry;
 import org.hibernate.search.jsr352.logging.impl.Log;
@@ -92,36 +93,22 @@ public final class JobContextUtil {
 
 	private static JobContextData createData(EntityManagerFactory emf, String entityTypes, String serializedCustomQueryCriteria)
 			throws ClassNotFoundException, IOException {
-		EntityManager em = null;
+		ExtendedSearchIntegrator searchIntegrator = ContextHelper.getSearchIntegratorBySF( emf.unwrap( SessionFactory.class ) );
+		List<String> entityNamesToIndex = Arrays.asList( entityTypes.split( "," ) );
+		Set<Class<?>> entityTypesToIndex = searchIntegrator
+				.getIndexedTypes()
+				.stream()
+				.filter( clz -> entityNamesToIndex.contains( clz.getName() ) )
+				.collect( Collectors.toCollection( HashSet::new ) );
 
-		try {
-			em = emf.createEntityManager();
-			List<String> entityNamesToIndex = Arrays.asList( entityTypes.split( "," ) );
-			Set<Class<?>> entityTypesToIndex = Search
-					.getFullTextEntityManager( em )
-					.getSearchFactory()
-					.getIndexedTypes()
-					.stream()
-					.filter( clz -> entityNamesToIndex.contains( clz.getName() ) )
-					.collect( Collectors.toCollection( HashSet::new ) );
+		Set<Criterion> criteria = MassIndexerUtil.deserializeCriteria( serializedCustomQueryCriteria );
+		log.criteriaSize( criteria.size() );
 
-			Set<Criterion> criteria = MassIndexerUtil.deserializeCriteria( serializedCustomQueryCriteria );
-			log.criteriaSize( criteria.size() );
-
-			JobContextData jobContextData = new JobContextData();
-			jobContextData.setEntityManagerFactory( emf );
-			jobContextData.setCustomQueryCriteria( criteria );
-			jobContextData.setEntityTypes( entityTypesToIndex );
-			return jobContextData;
-		}
-		finally {
-			try {
-				em.close();
-			}
-			catch (Exception e) {
-				log.unableToCloseEntityManager( e );
-			}
-		}
+		JobContextData jobContextData = new JobContextData();
+		jobContextData.setEntityManagerFactory( emf );
+		jobContextData.setCustomQueryCriteria( criteria );
+		jobContextData.setEntityTypes( entityTypesToIndex );
+		return jobContextData;
 	}
 
 }
