@@ -199,4 +199,20 @@ public interface Log extends org.hibernate.search.util.logging.impl.Log {
 			value = "entityName: '%1$s', rowsToIndex: %2$d")
 	void rowsToIndex(String entityName, long rowsToIndex);
 
+	@Message(id = JSR_352_MESSAGES_START_ID + 28,
+			value = "Unable to parse value '%1$s' for job parameter '%2$s'."
+	)
+	SearchException unableToParseJobParameter(String parameterName, Object parameterValue, @Cause Exception e);
+
+	@Message(id = JSR_352_MESSAGES_START_ID + 29,
+			value = "The value of parameter 'checkpointInterval' (value=%1$d) should be less than"
+					+ " the value of parameter 'rowsPerPartition' (value=%2$d)."
+	)
+	SearchException illegalCheckpointInterval(int checkpointInterval, int rowsPerPartition);
+
+	@Message(id = JSR_352_MESSAGES_START_ID + 30,
+			value = "The value of parameter '%1$s' (value=%2$d) should be greater than 0."
+	)
+	SearchException negativeValueOrZero(String parameterName, Number parameterValue);
+
 }
