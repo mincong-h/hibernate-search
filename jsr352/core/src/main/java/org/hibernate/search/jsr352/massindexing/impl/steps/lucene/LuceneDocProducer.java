@@ -11,26 +11,20 @@ import java.io.Serializable;
 import javax.batch.api.BatchProperty;
 import javax.batch.api.chunk.ItemProcessor;
 import javax.batch.runtime.context.JobContext;
-import javax.batch.runtime.context.StepContext;
 import javax.inject.Inject;
 import javax.naming.NamingException;
 import javax.persistence.EntityManagerFactory;
 
-import org.hibernate.Session;
-import org.hibernate.engine.spi.SessionImplementor;
 import org.hibernate.search.backend.AddLuceneWork;
 import org.hibernate.search.bridge.TwoWayFieldBridge;
 import org.hibernate.search.bridge.spi.ConversionContext;
 import org.hibernate.search.bridge.util.impl.ContextualExceptionBridgeHelper;
-import org.hibernate.search.engine.impl.HibernateSessionLoadingInitializer;
 import org.hibernate.search.engine.integration.impl.ExtendedSearchIntegrator;
 import org.hibernate.search.engine.spi.DocumentBuilderIndexedEntity;
 import org.hibernate.search.engine.spi.EntityIndexBinding;
-import org.hibernate.search.hcore.util.impl.ContextHelper;
 import org.hibernate.search.jsr352.logging.impl.Log;
 import org.hibernate.search.jsr352.massindexing.impl.JobContextData;
 import org.hibernate.search.jsr352.massindexing.impl.util.MassIndexingPartitionProperties;
-import org.hibernate.search.spi.InstanceInitializer;
 import org.hibernate.search.util.logging.impl.LoggerFactory;
 
 /**
@@ -47,15 +41,11 @@ public class LuceneDocProducer implements ItemProcessor {
 	private JobContext jobContext;
 
 	@Inject
-	private StepContext stepContext;
-
-	@Inject
 	@BatchProperty(name = MassIndexingPartitionProperties.ENTITY_NAME)
 	private String entityName;
 
 	private EntityManagerFactory emf;
 
-	private Session session;
 	private ExtendedSearchIntegrator searchIntegrator;
 	private EntityIndexBinding entityIndexBinding;
 	private DocumentBuilderIndexedEntity docBuilder;
@@ -80,17 +70,12 @@ public class LuceneDocProducer implements ItemProcessor {
 	 * @throws NamingException if JNDI lookup for entity manager failed
 	 */
 	private void setup() throws ClassNotFoundException, NamingException {
-
-		entityType = ( (JobContextData) jobContext.getTransientUserData() )
-				.getIndexedType( entityName );
-		PartitionContextData partitionData = (PartitionContextData) stepContext.getTransientUserData();
-		session = partitionData.getSession();
-		searchIntegrator = ContextHelper.getSearchIntegrator( session );
+		JobContextData jobContextData = (JobContextData) jobContext.getTransientUserData();
+		entityType = jobContextData.getIndexedType( entityName );
+		searchIntegrator = jobContextData.getSearchIntegrator();
 		entityIndexBinding = searchIntegrator.getIndexBindings().get( entityType );
 		docBuilder = entityIndexBinding.getDocumentBuilder();
-
-		JobContextData jobData = (JobContextData) jobContext.getTransientUserData();
-		emf = jobData.getEntityManagerFactory();
+		emf = jobContextData.getEntityManagerFactory();
 	}
 
 	/**
@@ -108,8 +93,6 @@ public class LuceneDocProducer implements ItemProcessor {
 		// ConcertManager)
 		String tenantId = null;
 		ConversionContext conversionContext = new ContextualExceptionBridgeHelper();
-		final InstanceInitializer sessionInitializer = new HibernateSessionLoadingInitializer(
-				(SessionImplementor) session );
 
 		Serializable id = (Serializable) emf.getPersistenceUnitUtil()
 				.getIdentifier( entity );
@@ -131,7 +114,13 @@ public class LuceneDocProducer implements ItemProcessor {
 				entity,
 				id,
 				idInString,
-				sessionInitializer,
+				/*
+				 * Use the default instance initializer (likely HibernateStatelessInitializer),
+				 * because we don't need the fancy features provided by HibernateSessionLoadingInitializer:
+				 * in our case, we never mix entities from different sessions, since
+				 * each partition uses its own session.
+				 */
+				null,
 				conversionContext );
 		return addWork;
 	}

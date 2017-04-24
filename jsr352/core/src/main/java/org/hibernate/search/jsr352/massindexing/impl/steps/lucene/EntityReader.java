@@ -192,9 +192,7 @@ public class EntityReader extends AbstractItemReader {
 			log.unableToCloseSession( e );
 		}
 		// reset the chunk work count to avoid over-count in item collector
-		// release session
 		PartitionContextData partitionData = (PartitionContextData) stepContext.getTransientUserData();
-		partitionData.setSession( null );
 		stepContext.setPersistentUserData( partitionData );
 	}
 
@@ -244,7 +242,6 @@ public class EntityReader extends AbstractItemReader {
 			}
 		}
 
-		partitionData.setSession( session );
 		stepContext.setTransientUserData( partitionData );
 	}
 
