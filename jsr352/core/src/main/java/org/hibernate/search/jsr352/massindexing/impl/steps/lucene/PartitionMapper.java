@@ -6,7 +6,10 @@
  */
 package org.hibernate.search.jsr352.massindexing.impl.steps.lucene;
 
+import java.lang.annotation.Annotation;
+import java.lang.reflect.Field;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Properties;
 import java.util.Set;
@@ -17,6 +20,7 @@ import javax.batch.api.partition.PartitionPlanImpl;
 import javax.batch.runtime.context.JobContext;
 import javax.inject.Inject;
 import javax.persistence.EntityManagerFactory;
+import javax.persistence.Id;
 
 import org.hibernate.Criteria;
 import org.hibernate.ScrollMode;
@@ -113,6 +117,20 @@ public class PartitionMapper implements javax.batch.api.partition.PartitionMappe
 		this.serializedRowsPerPartition = serializedRowsPerPartition;
 	}
 
+	/**
+	 * Gets the field having annotation {@link javax.persistence.Id}.
+	 * Return null if not found.
+	 */
+	private Field getIdField(Class<?> entityType) {
+		for ( Field field : entityType.getDeclaredFields() ) {
+			List<Annotation> annotations = Arrays.asList( field.getDeclaredAnnotations() );
+			if ( annotations.contains( Id.class ) ) {
+				return field;
+			}
+		}
+		return null;
+	}
+
 	@Override
 	public PartitionPlan mapPartitions() throws Exception {
 
@@ -127,6 +145,28 @@ public class PartitionMapper implements javax.batch.api.partition.PartitionMappe
 			ss = PersistenceUtil.openStatelessSession( emf, tenantId );
 
 			List<Class<?>> entityTypes = jobData.getEntityTypes();
+			for ( Class<?> entityType : entityTypes ) {
+				// TODO Can we have multiple fields having the @Id annotation?
+				Field id = getIdField( entityType );
+				if ( id == null ) {
+					log.debug( entityType.getClass() + " does not have annotation '@Id'." );
+					/*
+					 * TODO What should we do in this case?
+					 * Is it orderable or unorderable?
+					 */
+				}
+				else if ( id.getType().isPrimitive() ) {
+					log.debug( entityType.getClass() + "'s ID is primitive, so this type is orderable." );
+				}
+				else {
+					log.debug( entityType.getClass() + "'s ID is type '" + id.getType() + "'.");
+					/*
+					 * TODO Determine if this entity type is orderable:
+					 * If orderable, skip. Let criteria / HQL to handle it.
+					 * If unorderable, inspect the metadata, discover "nested" properties in the ID
+					 */
+				}
+			}
 			List<PartitionBound> partitionBounds = new ArrayList<>();
 			Class<?> entityType;
 
