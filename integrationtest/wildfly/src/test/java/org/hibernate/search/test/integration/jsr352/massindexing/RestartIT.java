@@ -108,6 +108,7 @@ public class RestartIT {
 				MassIndexingJob.NAME,
 				MassIndexingJob.parameters()
 						.forEntity( Message.class )
+						.maxThreads( 1 )
 						.build()
 				);
 		JobExecution jobExec1 = jobOperator.getJobExecution( execId1 );
