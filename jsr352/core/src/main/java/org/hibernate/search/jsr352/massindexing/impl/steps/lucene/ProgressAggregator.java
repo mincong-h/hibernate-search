@@ -46,6 +46,10 @@ public class ProgressAggregator extends AbstractPartitionAnalyzer {
 
 		// logging
 		StringBuilder sb = new StringBuilder( System.lineSeparator() );
+
+		sb.append( System.lineSeparator() ).append( "\t" ).append( partitionProgress );
+		sb.append( System.lineSeparator() ).append( "\t" ).append( "---" );
+
 		for ( String msg : stepProgress.getProgresses() ) {
 			sb.append( System.lineSeparator() ).append( "\t" ).append( msg );
 		}
