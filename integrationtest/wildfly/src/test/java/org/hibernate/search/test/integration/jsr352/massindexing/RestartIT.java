@@ -103,7 +103,7 @@ public class RestartIT {
 		JobOperator jobOperator = BatchRuntime.getJobOperator();
 
 		// The 1st execution. Keep it alive and wait Byteman to stop it
-		JobInterruptorUtil.enable();
+//		JobInterruptorUtil.enable();
 		long execId1 = jobOperator.start(
 				MassIndexingJob.NAME,
 				MassIndexingJob.parameters()
@@ -115,7 +115,7 @@ public class RestartIT {
 		jobExec1 = JobTestUtil.waitForTermination( jobOperator, jobExec1, JOB_TIMEOUT_MS );
 		assertEquals( BatchStatus.FAILED, jobExec1.getBatchStatus() );
 
-		JobInterruptorUtil.disable();
+//		JobInterruptorUtil.disable();
 
 		/*
 		// Restart the job. This is the 2nd execution.
