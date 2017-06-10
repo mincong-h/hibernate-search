@@ -61,7 +61,7 @@ public class StepProgress implements Serializable {
 	 *
 	 * @param pp partition-level indexing progress
 	 */
-	public void updateProgress(PartitionProgress pp) {
+	public synchronized void updateProgress(PartitionProgress pp) {
 		long prevDone = partitionProgress.getOrDefault( pp.getPartitionId(), 0L );
 		long currDone = pp.getWorkDone();
 		if ( currDone < prevDone ) {
