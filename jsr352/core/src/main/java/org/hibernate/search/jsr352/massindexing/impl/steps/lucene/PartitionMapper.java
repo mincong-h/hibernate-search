@@ -7,6 +7,7 @@
 package org.hibernate.search.jsr352.massindexing.impl.steps.lucene;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Properties;
 import java.util.Set;
@@ -153,10 +154,30 @@ public class PartitionMapper implements javax.batch.api.partition.PartitionMappe
 				props[i].setProperty( MassIndexingPartitionProperties.UPPER_BOUND, SerializationUtil.serialize( bound.getUpperBound() ) );
 			}
 
-			PartitionPlan partitionPlan = new PartitionPlanImpl();
-			partitionPlan.setPartitionProperties( props );
-			partitionPlan.setPartitions( partitions );
-			partitionPlan.setThreads( threads );
+			PartitionPlan partitionPlan = new PartitionPlanImpl() {
+				@Override
+				public Properties[] getPartitionProperties() {
+					return props;
+				}
+
+				@Override
+				public int getPartitions() {
+					return partitions;
+				}
+
+				@Override
+				public int getThreads() {
+					return threads;
+				}
+
+				@Override
+				public String toString() {
+					return "PartitionPlanImpl [partitions=" + partitions +
+							", threads=" + threads +
+							", props=" + Arrays.toString( props ) + "]";
+				}
+			};
+			log.info( partitionPlan );
 			return partitionPlan;
 		}
 		finally {
