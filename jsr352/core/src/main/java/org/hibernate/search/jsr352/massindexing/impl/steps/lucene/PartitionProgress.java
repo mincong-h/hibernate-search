@@ -16,6 +16,10 @@ public class PartitionProgress implements Serializable {
 	private static final long serialVersionUID = -5923539799807235429L;
 	private String entityName;
 	private int partitionId;
+
+	/**
+	 * The number of work done in the current partition.
+	 */
 	private long workDone;
 
 	public PartitionProgress(int partitionId, String entityName) {
@@ -59,7 +63,8 @@ public class PartitionProgress implements Serializable {
 
 	@Override
 	public String toString() {
-		return "PartitionProgress [workDone=" + workDone + ", entityName=" + entityName
-				+ ", partitionId=" + partitionId + "]";
+		return "PartitionProgress [partitionId=" + partitionId +
+				", workDone=" + workDone +
+				", entityName=" + entityName + "]";
 	}
 }
