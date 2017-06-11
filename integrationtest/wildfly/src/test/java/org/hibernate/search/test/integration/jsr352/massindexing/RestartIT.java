@@ -127,8 +127,9 @@ public class RestartIT {
 				.filter( m -> m.getType() == MetricType.WRITE_COUNT )
 				.collect( Collectors.toList() );
 		assertTrue( writeCountMetrics.size() == 1 );
-		assertTrue( writeCountMetrics.get(0).getValue() >= 2500 ); // Defined in BM script
-		assertTrue( writeCountMetrics.get(0).getValue() <= 5000 ); // 5000 = DB_DAY1_ROWS + DB_DAY2_ROWS
+		long writeCount = writeCountMetrics.get(0).getValue();
+		assertTrue( writeCount >= 2500 ); // Defined in BM script
+		assertTrue( writeCount <= 5000 ); // 5000 = DB_DAY1_ROWS + DB_DAY2_ROWS
 
 		// Restart the job. This is the 2nd execution.
 		long execId2 = jobOperator.restart( execId1, null );
