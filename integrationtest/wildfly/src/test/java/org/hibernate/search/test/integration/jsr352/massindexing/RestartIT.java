@@ -38,7 +38,6 @@ import org.jboss.shrinkwrap.api.spec.WebArchive;
 
 import org.junit.After;
 import org.junit.Before;
-import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
@@ -134,7 +133,6 @@ public class RestartIT {
 	}
 
 	@Test
-	@Ignore
 	public void testJob_usingCriteria() throws InterruptedException, IOException, ParseException {
 		assertEquals( 0, messageManager.findMessagesFor( SDF.parse( "31/08/2016" ) ).size() );
 		assertEquals( 0, messageManager.findMessagesFor( SDF.parse( "01/09/2016" ) ).size() );
@@ -165,7 +163,6 @@ public class RestartIT {
 	}
 
 	@Test
-	@Ignore
 	public void testJob_usingHQL() throws InterruptedException, IOException, ParseException {
 		assertEquals( 0, messageManager.findMessagesFor( SDF.parse( "31/08/2016" ) ).size() );
 		assertEquals( 0, messageManager.findMessagesFor( SDF.parse( "01/09/2016" ) ).size() );
