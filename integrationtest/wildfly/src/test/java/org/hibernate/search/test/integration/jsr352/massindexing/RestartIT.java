@@ -7,6 +7,7 @@
 package org.hibernate.search.test.integration.jsr352.massindexing;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 
 import java.io.IOException;
 import java.text.ParseException;
@@ -14,11 +15,16 @@ import java.text.SimpleDateFormat;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Locale;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import javax.batch.operations.JobOperator;
 import javax.batch.runtime.BatchRuntime;
 import javax.batch.runtime.BatchStatus;
 import javax.batch.runtime.JobExecution;
+import javax.batch.runtime.Metric;
+import javax.batch.runtime.Metric.MetricType;
+import javax.batch.runtime.StepExecution;
 import javax.inject.Inject;
 import javax.persistence.EntityManagerFactory;
 import javax.persistence.PersistenceUnit;
@@ -113,6 +119,15 @@ public class RestartIT {
 		jobExec1 = JobTestUtil.waitForTermination( jobOperator, jobExec1, JOB_TIMEOUT_MS );
 		JobInterruptorUtil.disable();
 
+		// Then the execution is failed
+		assertEquals( BatchStatus.FAILED, jobExec1.getBatchStatus() );
+		StepExecution stepExec = JobTestUtil.findStepExecution( jobExec1.getExecutionId(), "produceLuceneDoc" );
+		List<Metric> writeCountMetrics = Stream.of( stepExec.getMetrics() )
+				.filter( m -> m.getType() == MetricType.WRITE_COUNT )
+				.collect( Collectors.toList() );
+		assertTrue( writeCountMetrics.size() == 1 );
+		assertTrue( writeCountMetrics.get(0).getValue() >= 2500 ); // Defined in BM script
+
 		// Restart the job. This is the 2nd execution.
 		long execId2 = jobOperator.restart( execId1, null );
 		JobExecution jobExec2 = jobOperator.getJobExecution( execId2 );
@@ -142,6 +157,8 @@ public class RestartIT {
 		JobExecution jobExec1 = jobOperator.getJobExecution( execId1 );
 		jobExec1 = JobTestUtil.waitForTermination( jobOperator, jobExec1, JOB_TIMEOUT_MS );
 		JobInterruptorUtil.disable();
+
+		assertEquals( BatchStatus.FAILED, jobExec1.getBatchStatus() );
 
 		// Restart the job. This is the 2nd execution.
 		long execId2 = jobOperator.restart( execId1, null );

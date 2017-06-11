@@ -8,8 +8,10 @@ package org.hibernate.search.jsr352.test.util;
 
 import java.util.List;
 import javax.batch.operations.JobOperator;
+import javax.batch.runtime.BatchRuntime;
 import javax.batch.runtime.BatchStatus;
 import javax.batch.runtime.JobExecution;
+import javax.batch.runtime.StepExecution;
 import javax.persistence.EntityManagerFactory;
 
 import org.hibernate.Session;
@@ -78,6 +80,17 @@ public final class JobTestUtil {
 		@SuppressWarnings("unchecked")
 		List<T> result = fts.createFullTextQuery( luceneQuery ).getResultList();
 		return result;
+	}
+
+	public static StepExecution findStepExecution(long jobExecutionId, String stepName) {
+		JobOperator operator = BatchRuntime.getJobOperator();
+		for ( StepExecution stepExec : operator.getStepExecutions( jobExecutionId ) ) {
+			if ( stepName.equals( stepExec.getStepName() ) ) {
+				return stepExec;
+			}
+		}
+		String msg = "Step '" + stepName + "' not found in existing step executions (jobExecutionId=" + jobExecutionId + ")";
+		throw new IllegalStateException( msg );
 	}
 
 }
