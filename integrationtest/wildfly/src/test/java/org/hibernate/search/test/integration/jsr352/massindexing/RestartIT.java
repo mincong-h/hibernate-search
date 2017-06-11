@@ -30,10 +30,12 @@ import org.hibernate.search.test.integration.jsr352.massindexing.test.common.Mes
 import org.hibernate.search.test.integration.jsr352.massindexing.test.common.MessageManager;
 import org.hibernate.search.test.integration.jsr352.massindexing.test.util.JobInterruptorUtil;
 import org.jboss.arquillian.container.test.api.Deployment;
+import org.jboss.arquillian.container.test.api.RunAsClient;
 import org.jboss.arquillian.junit.Arquillian;
 import org.jboss.shrinkwrap.api.ShrinkWrap;
 import org.jboss.shrinkwrap.api.asset.EmptyAsset;
 import org.jboss.shrinkwrap.api.spec.WebArchive;
+
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Ignore;
@@ -79,6 +81,7 @@ public class RestartIT {
 	}
 
 	@Before
+	@RunAsClient
 	public void insertData() throws ParseException {
 		List<Message> messages = new LinkedList<>();
 		for ( int i = 0; i < DB_DAY1_ROWS; i++ ) {
@@ -91,6 +94,7 @@ public class RestartIT {
 	}
 
 	@After
+	@RunAsClient
 	public void removeAll() {
 		messageManager.removeAll();
 	}
