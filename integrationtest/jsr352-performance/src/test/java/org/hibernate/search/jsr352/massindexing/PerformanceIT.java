@@ -29,6 +29,7 @@ import org.hibernate.search.jsr352.massindexing.test.entity.CompanyManager;
 import org.hibernate.search.jsr352.massindexing.test.entity.Person;
 import org.hibernate.search.jsr352.massindexing.test.entity.PersonManager;
 import org.hibernate.search.jsr352.test.util.JobTestUtil;
+import org.hibernate.search.testsupport.TestConstants;
 import org.hibernate.search.util.logging.impl.LoggerFactory;
 
 import org.jboss.arquillian.container.test.api.Deployment;
@@ -53,14 +54,17 @@ public class PerformanceIT {
 
 	private static final String PERSISTENCE_UNIT_NAME = "h2";
 
-	private static final int JOB_TIMEOUT_MS = 300_000;
+	private static final boolean PERFORMANCE_ENABLED = TestConstants.arePerformanceTestsEnabled();
 
-	private static final int JOB_FETCH_SIZE = 100 * 1000;
+	private static final int MULTIPLIER = PERFORMANCE_ENABLED ? 1000 : 1;
+
+	private static final int JOB_TIMEOUT_MS = 300 * MULTIPLIER;
 	private static final int JOB_MAX_THREADS = 10;
-	private static final int JOB_ROWS_PER_PARTITION = 20 * 1000;
-	private static final int JOB_ITEM_COUNT = 500;
-	private static final int DB_COMP_ROWS = 10 * 1000;
-	private static final int DB_PERS_ROWS = 10 * 1000;
+	private static final int JOB_ROWS_PER_PARTITION = 1000;
+	private static final int JOB_ITEM_COUNT = 200;
+	private static final int JOB_BATCH_SIZE_TO_LOAD_OBJECTS = 500;
+	private static final int DB_COMP_ROWS = 10 * MULTIPLIER;
+	private static final int DB_PERS_ROWS = 10 * MULTIPLIER;
 
 	@PersistenceContext(unitName = PERSISTENCE_UNIT_NAME)
 	private EntityManager em;
@@ -78,6 +82,7 @@ public class PerformanceIT {
 				.addAsResource( "META-INF/batch-jobs/make-deployment-as-batch-app.xml" ) // WFLY-7000
 				.addAsWebInfResource( "jboss-deployment-structure.xml" )
 				.addAsWebInfResource( EmptyAsset.INSTANCE, "beans.xml" )
+				.addPackage( TestConstants.class.getPackage() )
 				.addPackage( JobTestUtil.class.getPackage() )
 				.addPackage( Company.class.getPackage() );
 		return war;
@@ -144,7 +149,7 @@ public class PerformanceIT {
 
 		// Start the job
 		ftem.createIndexer()
-				.batchSizeToLoadObjects( 500 )
+				.batchSizeToLoadObjects( JOB_BATCH_SIZE_TO_LOAD_OBJECTS )
 				.threadsToLoadObjects( JOB_MAX_THREADS )
 				.cacheMode( CacheMode.IGNORE )
 				.startAndWait();
@@ -170,7 +175,6 @@ public class PerformanceIT {
 				MassIndexingJob.NAME,
 				MassIndexingJob.parameters()
 						.forEntities( Company.class, Person.class )
-						.fetchSize( JOB_FETCH_SIZE )
 						.maxThreads( JOB_MAX_THREADS )
 						.rowsPerPartition( JOB_ROWS_PER_PARTITION )
 						.checkpointInterval( JOB_ITEM_COUNT )
