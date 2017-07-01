@@ -20,13 +20,6 @@ public class PartitionBound {
 	private Object lowerBound;
 	private Object upperBound;
 
-	public PartitionBound() {
-	}
-
-	public PartitionBound(Class<?> entityType) {
-		this.entityType = entityType;
-	}
-
 	public PartitionBound(Class<?> entityType, Object lowerBound, Object upperBound) {
 		this.entityType = entityType;
 		this.lowerBound = lowerBound;
@@ -45,24 +38,20 @@ public class PartitionBound {
 		return lowerBound;
 	}
 
+	public void setLowerBound(Object lowerBound) {
+		this.lowerBound = lowerBound;
+	}
+
 	public Object getUpperBound() {
 		return upperBound;
 	}
 
-	public boolean isFirstPartition() {
-		return lowerBound == null && upperBound != null;
+	public boolean hasUpperBound() {
+		return upperBound != null;
 	}
 
-	public boolean isLastPartition() {
-		return lowerBound != null && upperBound == null;
-	}
-
-	public boolean isUniquePartition() {
-		return lowerBound == null && upperBound == null;
-	}
-
-	public void setEntityType(Class<?> entityType) {
-		this.entityType = entityType;
+	public boolean hasLowerBound() {
+		return lowerBound != null;
 	}
 
 	@Override

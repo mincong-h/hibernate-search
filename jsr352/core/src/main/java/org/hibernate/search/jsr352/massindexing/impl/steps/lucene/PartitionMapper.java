@@ -24,7 +24,6 @@ import org.hibernate.ScrollableResults;
 import org.hibernate.Session;
 import org.hibernate.StatelessSession;
 import org.hibernate.criterion.Criterion;
-import org.hibernate.criterion.Order;
 import org.hibernate.criterion.Projections;
 import org.hibernate.search.jsr352.logging.impl.Log;
 import org.hibernate.search.jsr352.massindexing.MassIndexingJobParameters;
@@ -120,11 +119,13 @@ public class PartitionMapper implements javax.batch.api.partition.PartitionMappe
 		Session session = null;
 		StatelessSession ss = null;
 		ScrollableResults scroll = null;
+		Criteria criteria;
 
 		try {
 			emf = jobData.getEntityManagerFactory();
 			session = PersistenceUtil.openSession( emf, tenantId );
 			ss = PersistenceUtil.openStatelessSession( emf, tenantId );
+			int fetchSize = SerializationUtil.parseIntegerParameter( FETCH_SIZE, serializedFetchSize );
 
 			List<Class<?>> entityTypes = jobData.getEntityTypes();
 			List<PartitionBound> partitionBounds = new ArrayList<>();
@@ -138,13 +139,24 @@ public class PartitionMapper implements javax.batch.api.partition.PartitionMappe
 
 				case CRITERIA:
 					entityType = entityTypes.get( 0 );
-					scroll = buildScrollableResults( ss, session, entityType, jobData.getCustomQueryCriteria() );
+					criteria = ss.createCriteria( entityType );
+					PersistenceUtil.createIdOrders( emf, entityType ).forEach( criteria::addOrder );
+					jobData.getCustomQueryCriteria().forEach( criteria::add );
+					scroll = criteria.setProjection( Projections.id() )
+							.setFetchSize( fetchSize )
+							.setReadOnly( true )
+							.scroll( ScrollMode.FORWARD_ONLY );
 					partitionBounds = buildPartitionUnitsFrom( scroll, entityType );
 					break;
 
 				case FULL_ENTITY:
 					for ( Class<?> clz : entityTypes ) {
-						scroll = buildScrollableResults( ss, session, clz, null );
+						criteria = ss.createCriteria( clz );
+						PersistenceUtil.createIdOrders( emf, clz ).forEach( criteria::addOrder );
+						scroll = criteria.setProjection( Projections.id() )
+								.setFetchSize( fetchSize )
+								.setReadOnly( true )
+								.scroll( ScrollMode.FORWARD_ONLY );
 						partitionBounds.addAll( buildPartitionUnitsFrom( scroll, clz ) );
 					}
 					break;
@@ -238,19 +250,4 @@ public class PartitionMapper implements javax.batch.api.partition.PartitionMappe
 		return partitionUnits;
 	}
 
-	private ScrollableResults buildScrollableResults(StatelessSession ss,
-			Session session, Class<?> clazz, Set<Criterion> criterions) {
-		Criteria criteria = ss.createCriteria( clazz );
-		if ( criterions != null ) {
-			criterions.forEach( c -> criteria.add( c ) );
-		}
-		int fetchSize = SerializationUtil.parseIntegerParameter( FETCH_SIZE, serializedFetchSize );
-		ScrollableResults scroll = criteria
-				.setProjection( Projections.alias( Projections.id(), "aliasedId" ) )
-				.setFetchSize( fetchSize )
-				.setReadOnly( true )
-				.addOrder( Order.asc( "aliasedId" ) )
-				.scroll( ScrollMode.FORWARD_ONLY );
-		return scroll;
-	}
 }
