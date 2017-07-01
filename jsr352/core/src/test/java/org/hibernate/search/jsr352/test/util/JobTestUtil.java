@@ -16,7 +16,10 @@ import org.hibernate.Session;
 import org.hibernate.SessionFactory;
 import org.hibernate.search.FullTextSession;
 import org.hibernate.search.Search;
+import org.hibernate.search.jpa.FullTextEntityManager;
+import org.hibernate.search.jpa.FullTextQuery;
 import org.hibernate.search.jsr352.logging.impl.Log;
+import org.hibernate.search.query.dsl.QueryBuilder;
 import org.hibernate.search.util.logging.impl.LoggerFactory;
 
 import org.apache.lucene.search.Query;
@@ -53,6 +56,14 @@ public final class JobTestUtil {
 		}
 
 		return jobExecution;
+	}
+
+	public static <T> int nbDocumentsInIndex(EntityManagerFactory emf, Class<T> clazz) {
+		FullTextEntityManager em = org.hibernate.search.jpa.Search.getFullTextEntityManager( emf.createEntityManager() );
+		QueryBuilder queryBuilder = em.getSearchFactory().buildQueryBuilder().forEntity( clazz ).get();
+		Query allQuery = queryBuilder.all().createQuery();
+		FullTextQuery fullTextQuery = em.createFullTextQuery( allQuery, clazz );
+		return fullTextQuery.getResultSize();
 	}
 
 	public static <T> List<T> findIndexedResults(EntityManagerFactory emf, Class<T> clazz, String key, String value) {
