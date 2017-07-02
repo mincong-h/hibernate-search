@@ -8,6 +8,7 @@ package org.hibernate.search.jsr352.massindexing.impl.steps.lucene;
 
 import java.lang.annotation.Annotation;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Properties;
 import java.util.Set;
@@ -19,7 +20,6 @@ import javax.batch.api.partition.PartitionPlanImpl;
 import javax.batch.runtime.context.JobContext;
 import javax.inject.Inject;
 import javax.persistence.Embeddable;
-import javax.persistence.EmbeddedId;
 import javax.persistence.EntityManagerFactory;
 import javax.persistence.metamodel.EntityType;
 
@@ -36,6 +36,7 @@ import org.hibernate.search.jsr352.massindexing.MassIndexingJobParameters;
 import org.hibernate.search.jsr352.massindexing.impl.JobContextData;
 import org.hibernate.search.jsr352.massindexing.impl.util.MassIndexingPartitionProperties;
 import org.hibernate.search.jsr352.massindexing.impl.util.PartitionBound;
+import org.hibernate.search.jsr352.massindexing.impl.util.PartitionUtil;
 import org.hibernate.search.jsr352.massindexing.impl.util.PersistenceUtil;
 import org.hibernate.search.jsr352.massindexing.impl.util.SerializationUtil;
 import org.hibernate.search.util.logging.impl.LoggerFactory;
@@ -154,7 +155,27 @@ public class PartitionMapper implements javax.batch.api.partition.PartitionMappe
 						break;
 
 					case CUSTOM_SORT:
-						throw new UnsupportedOperationException( "Not implemented yet." );
+						List<Object> entityIds = new ArrayList<>();
+						int fetchSize = SerializationUtil.parseIntegerParameter( FETCH_SIZE, serializedFetchSize );
+						Class<?> idType = emf.getMetamodel().entity( entityType ).getIdType().getJavaType();
+						Criteria criteria = ss.createCriteria( entityType );
+
+						scroll = criteria.setProjection( Projections.alias( Projections.id(), "aliasedId" ) )
+								.setFetchSize( fetchSize )
+								.setReadOnly( true )
+								.addOrder( Order.asc( "aliasedId" ) )
+								.scroll( ScrollMode.FORWARD_ONLY );
+
+						while ( scroll.next() ) {
+							entityIds.add( scroll.get() );
+						}
+						scroll.close();
+
+						// TODO Sort entity IDs
+						Collections.sort( entityIds, null );
+
+						// TODO build partition units;
+						break;
 				}
 			}
 			//@formatter:off

@@ -108,7 +108,7 @@ public class MassIndexingJobWithEmbeddedIdTest {
 	}
 
 	@Test
-	@Ignore
+	@Ignore("Implementing customized sorting for non-comparable embedded id...")
 	public void cannotHandleEmbeddedId_whenNonComparable() throws Exception {
 		Properties props = MassIndexingJob.parameters()
 				.forEntities( EntityWithNonComparableId.class )
