@@ -63,8 +63,8 @@ public class PartitionMapper implements javax.batch.api.partition.PartitionMappe
 
 	private static final Log log = LoggerFactory.make( Log.class );
 
-	private enum Type {
-		HQL, CRITERIA, FULL_ENTITY
+	private enum PartitionStrategy {
+		HQL, CRITERIA, FULL_ENTITY, CUSTOM_SORT
 	}
 
 	@Inject
@@ -128,26 +128,29 @@ public class PartitionMapper implements javax.batch.api.partition.PartitionMappe
 
 			List<Class<?>> entityTypes = jobData.getEntityTypes();
 			List<PartitionBound> partitionBounds = new ArrayList<>();
-			Class<?> entityType;
+			Set<Criterion> customQueryCriteria = jobData.getCustomQueryCriteria();
 
-			switch ( typeOfSelection( customQueryHql, jobData.getCustomQueryCriteria() ) ) {
-				case HQL:
-					entityType = entityTypes.get( 0 );
-					partitionBounds.add( new PartitionBound( entityType, null, null ) );
-					break;
+			for ( Class<?> entityType : entityTypes ) {
+				PartitionStrategy strategy = determineStrategy( entityType, customQueryHql, customQueryCriteria );
+				switch ( strategy ) {
+					case HQL:
+						entityType = entityTypes.get( 0 );
+						partitionBounds.add( new PartitionBound( entityType, null, null ) );
+						break;
 
-				case CRITERIA:
-					entityType = entityTypes.get( 0 );
-					scroll = buildScrollableResults( ss, session, entityType, jobData.getCustomQueryCriteria() );
-					partitionBounds = buildPartitionUnitsFrom( scroll, entityType );
-					break;
+					case CRITERIA:
+						entityType = entityTypes.get( 0 );
+						scroll = buildScrollableResults( ss, session, entityType, jobData.getCustomQueryCriteria() );
+						partitionBounds = buildPartitionUnitsFrom( scroll, entityType );
+						break;
 
-				case FULL_ENTITY:
-					for ( Class<?> clz : entityTypes ) {
-						scroll = buildScrollableResults( ss, session, clz, null );
-						partitionBounds.addAll( buildPartitionUnitsFrom( scroll, clz ) );
-					}
-					break;
+					case FULL_ENTITY:
+						for ( Class<?> clz : entityTypes ) {
+							scroll = buildScrollableResults( ss, session, clz, null );
+							partitionBounds.addAll( buildPartitionUnitsFrom( scroll, clz ) );
+						}
+						break;
+				}
 			}
 
 			// Build partition plan
@@ -197,15 +200,15 @@ public class PartitionMapper implements javax.batch.api.partition.PartitionMappe
 		}
 	}
 
-	private Type typeOfSelection(String hql, Set<Criterion> criterions) {
+	private <T> PartitionStrategy determineStrategy(Class<T> entityType, String hql, Set<Criterion> criteria) {
 		if ( hql != null && !hql.isEmpty() ) {
-			return Type.HQL;
+			return PartitionStrategy.HQL;
 		}
-		else if ( criterions != null && criterions.size() > 0 ) {
-			return Type.CRITERIA;
+		else if ( criteria != null && criteria.size() > 0 ) {
+			return PartitionStrategy.CRITERIA;
 		}
 		else {
-			return Type.FULL_ENTITY;
+			return PartitionStrategy.FULL_ENTITY;
 		}
 	}
 
