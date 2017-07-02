@@ -6,17 +6,22 @@
  */
 package org.hibernate.search.jsr352.massindexing.impl.steps.lucene;
 
+import java.lang.annotation.Annotation;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
 import java.util.Set;
+import java.util.stream.Stream;
 
 import javax.batch.api.BatchProperty;
 import javax.batch.api.partition.PartitionPlan;
 import javax.batch.api.partition.PartitionPlanImpl;
 import javax.batch.runtime.context.JobContext;
 import javax.inject.Inject;
+import javax.persistence.Embeddable;
+import javax.persistence.EmbeddedId;
 import javax.persistence.EntityManagerFactory;
+import javax.persistence.metamodel.EntityType;
 
 import org.hibernate.Criteria;
 import org.hibernate.ScrollMode;
@@ -39,6 +44,7 @@ import static org.hibernate.search.jsr352.massindexing.MassIndexingJobParameters
 import static org.hibernate.search.jsr352.massindexing.MassIndexingJobParameters.MAX_THREADS;
 import static org.hibernate.search.jsr352.massindexing.MassIndexingJobParameters.ROWS_PER_PARTITION;
 
+//@formatter:off
 /**
  * This partition mapper provides a dynamic partition plan for chunk processing.
  * <p>
@@ -129,30 +135,29 @@ public class PartitionMapper implements javax.batch.api.partition.PartitionMappe
 			List<Class<?>> entityTypes = jobData.getEntityTypes();
 			List<PartitionBound> partitionBounds = new ArrayList<>();
 			Set<Criterion> customQueryCriteria = jobData.getCustomQueryCriteria();
-
+			//@formatter:on
 			for ( Class<?> entityType : entityTypes ) {
 				PartitionStrategy strategy = determineStrategy( entityType, customQueryHql, customQueryCriteria );
 				switch ( strategy ) {
 					case HQL:
-						entityType = entityTypes.get( 0 );
 						partitionBounds.add( new PartitionBound( entityType, null, null ) );
 						break;
 
 					case CRITERIA:
-						entityType = entityTypes.get( 0 );
 						scroll = buildScrollableResults( ss, session, entityType, jobData.getCustomQueryCriteria() );
 						partitionBounds = buildPartitionUnitsFrom( scroll, entityType );
 						break;
 
 					case FULL_ENTITY:
-						for ( Class<?> clz : entityTypes ) {
-							scroll = buildScrollableResults( ss, session, clz, null );
-							partitionBounds.addAll( buildPartitionUnitsFrom( scroll, clz ) );
-						}
+						scroll = buildScrollableResults( ss, session, entityType, null );
+						partitionBounds.addAll( buildPartitionUnitsFrom( scroll, entityType ) );
 						break;
+
+					case CUSTOM_SORT:
+						throw new UnsupportedOperationException( "Not implemented yet." );
 				}
 			}
-
+			//@formatter:off
 			// Build partition plan
 			final int threads = SerializationUtil.parseIntegerParameter( MAX_THREADS, serializedMaxThreads );
 			final int partitions = partitionBounds.size();
@@ -199,8 +204,22 @@ public class PartitionMapper implements javax.batch.api.partition.PartitionMappe
 			}
 		}
 	}
-
-	private <T> PartitionStrategy determineStrategy(Class<T> entityType, String hql, Set<Criterion> criteria) {
+	//@formatter:on
+	private PartitionStrategy determineStrategy(Class<?> entity, String hql, Set<Criterion> criteria) {
+		EntityType<?> entityType = emf.getMetamodel().entity( entity );
+		/*
+		 * Detect @Id or @EmbeddedId. If true, determine whether a
+		 * customized sort is necessary: it's necessary when the id
+		 * of the entity is @EmbeddedId but not comparable.
+		 */
+		if ( entityType.hasSingleIdAttribute() ) {
+			Class<?> idClassType = entityType.getIdType().getJavaType();
+			boolean isIdComparable = Comparable.class.isAssignableFrom( idClassType );
+			boolean isIdEmbeddable = isIdEmbeddable( idClassType );
+			if ( isIdEmbeddable && !isIdComparable ) {
+				return PartitionStrategy.CUSTOM_SORT;
+			}
+		}
 		if ( hql != null && !hql.isEmpty() ) {
 			return PartitionStrategy.HQL;
 		}
@@ -212,6 +231,14 @@ public class PartitionMapper implements javax.batch.api.partition.PartitionMappe
 		}
 	}
 
+	private boolean isIdEmbeddable(Class<?> idClassType) {
+		return Stream.of( idClassType.getAnnotations() )
+				.map( Annotation::annotationType )
+				.filter( a -> a == Embeddable.class )
+				.count() > 0;
+	}
+
+	//@formatter:off
 	private List<PartitionBound> buildPartitionUnitsFrom(ScrollableResults scroll, Class<?> clazz) {
 		List<PartitionBound> partitionUnits = new ArrayList<>();
 		int rowsPerPartition = SerializationUtil.parseIntegerParameter( ROWS_PER_PARTITION, serializedRowsPerPartition );

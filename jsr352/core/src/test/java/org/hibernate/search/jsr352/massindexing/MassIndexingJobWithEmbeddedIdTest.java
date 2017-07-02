@@ -29,6 +29,7 @@ import org.hibernate.search.testsupport.TestForIssue;
 import org.junit.After;
 import org.junit.AfterClass;
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Test;
 
 import static org.fest.assertions.Assertions.assertThat;
@@ -107,6 +108,7 @@ public class MassIndexingJobWithEmbeddedIdTest {
 	}
 
 	@Test
+	@Ignore
 	public void cannotHandleEmbeddedId_whenNonComparable() throws Exception {
 		Properties props = MassIndexingJob.parameters()
 				.forEntities( EntityWithNonComparableId.class )
