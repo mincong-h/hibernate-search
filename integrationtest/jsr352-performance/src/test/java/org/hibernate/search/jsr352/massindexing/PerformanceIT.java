@@ -24,10 +24,12 @@ import org.hibernate.CacheMode;
 import org.hibernate.search.jpa.FullTextEntityManager;
 import org.hibernate.search.jpa.Search;
 import org.hibernate.search.jsr352.logging.impl.Log;
+import org.hibernate.search.jsr352.massindexing.test.bridge.DateIdBridge;
 import org.hibernate.search.jsr352.massindexing.test.entity.Company;
 import org.hibernate.search.jsr352.massindexing.test.entity.CompanyManager;
 import org.hibernate.search.jsr352.massindexing.test.entity.Person;
 import org.hibernate.search.jsr352.massindexing.test.entity.PersonManager;
+import org.hibernate.search.jsr352.massindexing.test.id.DatePK;
 import org.hibernate.search.jsr352.test.util.JobTestUtil;
 import org.hibernate.search.testsupport.TestConstants;
 import org.hibernate.search.util.logging.impl.LoggerFactory;
@@ -84,6 +86,8 @@ public class PerformanceIT {
 				.addAsWebInfResource( EmptyAsset.INSTANCE, "beans.xml" )
 				.addPackage( TestConstants.class.getPackage() )
 				.addPackage( JobTestUtil.class.getPackage() )
+				.addPackage( DatePK.class.getPackage() )
+				.addPackage( DateIdBridge.class.getPackage() )
 				.addPackage( Company.class.getPackage() );
 		return war;
 	}
