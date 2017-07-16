@@ -7,11 +7,14 @@
 package org.hibernate.search.jsr352.massindexing;
 
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.Properties;
 import java.util.Set;
 import java.util.stream.Collectors;
+
+import javax.persistence.criteria.Predicate;
 
 import org.hibernate.Criteria;
 import org.hibernate.criterion.Criterion;
@@ -104,6 +107,7 @@ public final class MassIndexingJob {
 		private Integer rowsPerPartition;
 		private Integer maxThreads;
 		private Set<Criterion> customQueryCriteria;
+		private Set<Predicate> customQueryPredicates = new HashSet<>();
 		private String customQueryHql;
 		private Integer customQueryLimit;
 		private String tenantId;
@@ -259,7 +263,10 @@ public final class MassIndexingJob {
 		 * @param criterion criterion.
 		 *
 		 * @return itself
+		 *
+		 * @deprecated Use {@link #restrictedBy(Predicate...)} instead.
 		 */
+		@Deprecated
 		public ParametersBuilder restrictedBy(Criterion criterion) {
 			if ( customQueryHql != null ) {
 				throw new IllegalArgumentException( "Cannot use HQL approach and Criteria approach in the same time." );
@@ -268,6 +275,26 @@ public final class MassIndexingJob {
 				throw new NullPointerException( "The criterion is null." );
 			}
 			customQueryCriteria.add( criterion );
+			return this;
+		}
+
+		/**
+		 * Add {@link Predicate}s to construct a customized selection of
+		 * mass-indexing under the criteria approach. You can call this method
+		 * multiple times to add multiple predicates: only entities matching
+		 * every predicate will be indexed. However, mixing this approach with
+		 * the HQL restriction is not allowed.
+		 *
+		 * @param predicates Criteria predicates to restrict the mass-indexing
+		 * selection.
+		 *
+		 * @return itself
+		 */
+		public ParametersBuilder restrictedBy(Predicate... predicates) {
+			if ( customQueryHql != null ) {
+				throw new IllegalArgumentException( "Cannot use HQL approach and Criteria approach in the same time." );
+			}
+			customQueryPredicates.addAll( Arrays.asList( predicates ) );
 			return this;
 		}
 
@@ -362,6 +389,18 @@ public final class MassIndexingJob {
 				}
 				catch (IOException e) {
 					throw log.failToSerializeObject( Criteria.class, e );
+				}
+			}
+
+			if ( !customQueryPredicates.isEmpty() ) {
+				try {
+					jobParams.put(
+							MassIndexingJobParameters.CUSTOM_QUERY_PREDICATES,
+							SerializationUtil.serialize( customQueryPredicates )
+					);
+				}
+				catch (IOException e) {
+					throw log.failToSerializeObject( Predicate.class, e );
 				}
 			}
 
