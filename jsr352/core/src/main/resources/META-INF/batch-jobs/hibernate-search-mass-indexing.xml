@@ -25,6 +25,7 @@
                 <property name="rowsPerPartition" value="#{jobParameters['rowsPerPartition']}?:1000;" />
 
                 <property name="customQueryCriteria" value="#{jobParameters['customQueryCriteria']}" />
+                <property name="customQueryPredicates" value="#{jobParameters['customQueryPredicates']}" />
                 <property name="customQueryLimit" value="#{jobParameters['customQueryLimit']}" />
             </properties>
         </listener>

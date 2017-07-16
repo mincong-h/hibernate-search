@@ -11,6 +11,7 @@ import javax.batch.api.listener.AbstractJobListener;
 import javax.batch.runtime.context.JobContext;
 import javax.inject.Inject;
 import javax.inject.Named;
+import javax.persistence.criteria.Predicate;
 
 import org.hibernate.Criteria;
 import org.hibernate.search.exception.SearchException;
@@ -24,8 +25,8 @@ import org.hibernate.search.util.StringHelper;
 import static org.hibernate.search.jsr352.massindexing.MassIndexingJobParameters.CACHEABLE;
 import static org.hibernate.search.jsr352.massindexing.MassIndexingJobParameters.CHECKPOINT_INTERVAL;
 import static org.hibernate.search.jsr352.massindexing.MassIndexingJobParameters.CUSTOM_QUERY_CRITERIA;
-import static org.hibernate.search.jsr352.massindexing.MassIndexingJobParameters.CUSTOM_QUERY_HQL;
 import static org.hibernate.search.jsr352.massindexing.MassIndexingJobParameters.CUSTOM_QUERY_LIMIT;
+import static org.hibernate.search.jsr352.massindexing.MassIndexingJobParameters.CUSTOM_QUERY_PREDICATES;
 import static org.hibernate.search.jsr352.massindexing.MassIndexingJobParameters.ENTITY_MANAGER_FACTORY_REFERENCE;
 import static org.hibernate.search.jsr352.massindexing.MassIndexingJobParameters.ENTITY_MANAGER_FACTORY_SCOPE;
 import static org.hibernate.search.jsr352.massindexing.MassIndexingJobParameters.ENTITY_TYPES;
@@ -104,6 +105,10 @@ public class JobContextSetupListener extends AbstractJobListener {
 	private String serializedCustomQueryCriteria;
 
 	@Inject
+	@BatchProperty(name = CUSTOM_QUERY_PREDICATES)
+	private String serializedCustomQueryPredicates;
+
+	@Inject
 	@BatchProperty(name = CUSTOM_QUERY_LIMIT)
 	private String serializedCustomQueryLimit;
 
@@ -173,7 +178,10 @@ public class JobContextSetupListener extends AbstractJobListener {
 		SerializationUtil.parseBooleanParameter( CACHEABLE, serializedCacheable );
 
 		if ( StringHelper.isNotEmpty( serializedCustomQueryCriteria ) ) {
-			SerializationUtil.parseParameter( Criteria.class, CUSTOM_QUERY_HQL, serializedCustomQueryCriteria );
+			SerializationUtil.parseParameter( Criteria.class, CUSTOM_QUERY_CRITERIA, serializedCustomQueryCriteria );
+		}
+		if ( StringHelper.isNotEmpty( serializedCustomQueryPredicates ) ) {
+			SerializationUtil.parseParameter( Predicate.class, CUSTOM_QUERY_PREDICATES, serializedCustomQueryPredicates );
 		}
 	}
 
