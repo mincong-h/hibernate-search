@@ -12,12 +12,11 @@ import javax.batch.runtime.context.JobContext;
 import javax.inject.Inject;
 import javax.persistence.EntityManagerFactory;
 
-import org.hibernate.Session;
-import org.hibernate.search.hcore.util.impl.ContextHelper;
+import org.hibernate.search.jpa.FullTextEntityManager;
+import org.hibernate.search.jpa.Search;
 import org.hibernate.search.jsr352.logging.impl.Log;
 import org.hibernate.search.jsr352.massindexing.MassIndexingJobParameters;
 import org.hibernate.search.jsr352.massindexing.impl.JobContextData;
-import org.hibernate.search.jsr352.massindexing.impl.util.PersistenceUtil;
 import org.hibernate.search.jsr352.massindexing.impl.util.SerializationUtil;
 import org.hibernate.search.util.logging.impl.LoggerFactory;
 
@@ -43,7 +42,7 @@ public class AfterChunkBatchlet extends AbstractBatchlet {
 	@BatchProperty(name = MassIndexingJobParameters.TENANT_ID)
 	private String tenantId;
 
-	private Session session;
+	private FullTextEntityManager ftem;
 
 	@Override
 	public String process() throws Exception {
@@ -54,19 +53,15 @@ public class AfterChunkBatchlet extends AbstractBatchlet {
 
 			JobContextData jobData = (JobContextData) jobContext.getTransientUserData();
 			EntityManagerFactory emf = jobData.getEntityManagerFactory();
-			session = PersistenceUtil.openSession( emf, tenantId );
-			ContextHelper.getSearchIntegrator( session ).optimize();
+			// FIXME Multi-tenancy is not handled
+			ftem = Search.getFullTextEntityManager( emf.createEntityManager() );
+			ftem.getSearchFactory().optimize();
 		}
 		return null;
 	}
 
 	@Override
 	public void stop() throws Exception {
-		try {
-			session.close();
-		}
-		catch (Exception e) {
-			log.unableToCloseSession( e );
-		}
+		ftem.close();
 	}
 }
