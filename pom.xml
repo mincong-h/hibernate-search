@@ -226,9 +226,9 @@
         <arquillianVersion>1.1.11.Final</arquillianVersion>
         <arquillianContainerVersion>2.0.0.Final</arquillianContainerVersion>
         <shrinkwrapResolverVersion>2.2.2</shrinkwrapResolverVersion>
-        <wildflyVersion>10.1.0.Final</wildflyVersion>
+        <wildflyVersion>11.0.0.Alpha1</wildflyVersion>
         <jmhVersion>1.11.2</jmhVersion>
-        
+
         <!-- Elasticsearch -->
         <test.elasticsearch.host.url>http://localhost:9200</test.elasticsearch.host.url>
         <test.elasticsearch.host.username></test.elasticsearch.host.username>
