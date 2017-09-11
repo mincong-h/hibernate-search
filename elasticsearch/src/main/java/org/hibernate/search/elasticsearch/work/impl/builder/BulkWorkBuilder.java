@@ -6,12 +6,13 @@
  */
 package org.hibernate.search.elasticsearch.work.impl.builder;
 
+import org.hibernate.search.elasticsearch.work.impl.BulkResult;
 import org.hibernate.search.elasticsearch.work.impl.ElasticsearchWork;
 
 /**
  * @author Yoann Rodiere
  */
-public interface BulkWorkBuilder extends ElasticsearchWorkBuilder<ElasticsearchWork<Void>> {
+public interface BulkWorkBuilder extends ElasticsearchWorkBuilder<ElasticsearchWork<BulkResult>> {
 
 	BulkWorkBuilder refresh(boolean refresh);
 

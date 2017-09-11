@@ -520,7 +520,7 @@ public interface Log extends BasicLogger {
 
 	@Message(id = 169, value = "FieldBridge '%1$s' does not have a objectToString method: field '%2$s' in '%3$s'" +
 			" The FieldBridge must be a TwoWayFieldBridge or you have to enable the ignoreFieldBridge option when defining a Query")
-	SearchException fieldBridgeNotTwoWay(@FormatWith(ClassFormatter.class) Class<? extends FieldBridge> bridgeClass, String fieldName, XClass beanXClass);
+	SearchException fieldBridgeNotTwoWay(@FormatWith(ClassFormatter.class) Class<? extends FieldBridge> bridgeClass, String fieldName, String typeName);
 
 	@Message(id = 176, value = "Document could not be parsed")
 	SearchException unableToParseDocument(@Cause Throwable cause);
@@ -632,7 +632,7 @@ public interface Log extends BasicLogger {
 	SearchException invalidPropertyValue(String value, String property);
 
 	@Message(id = 218, value = "More like this query cannot be created, because the index does not contain a field '%s' for the type '%s" )
-	SearchException unknownFieldNameForMoreLikeThisQuery(String field, String type);
+	SearchException unknownFieldNameForMoreLikeThisQuery(String field, @FormatWith(IndexedTypeIdentifierFormatter.class) IndexedTypeIdentifier type);
 
 	@Message(id = 219, value = "Could not lookup initial JNDI context for the JMS ConnectionFactory named '%s' for the index '%s" )
 	SearchException jmsInitialContextException(String jmsConnectionFactoryName, String indexName, @Cause Exception e);
@@ -975,7 +975,7 @@ public interface Log extends BasicLogger {
 	SearchException indexNamesCollisionDetected(String string);
 
 	@Message(id = 327, value = "Unsupported indexNullAs token type '%3$s' on field '%2$s' of entity '%1$s'." )
-	SearchException unsupportedNullTokenType(String entityName, String fieldName, Class<?> tokenType);
+	SearchException unsupportedNullTokenType(@FormatWith(IndexedTypeIdentifierFormatter.class) IndexedTypeIdentifier entityName, String fieldName, Class<?> tokenType);
 
 	@Message(id = 328, value = "Cannot create context for class: %1$s" )
 	SearchException cannotCreateBridgeDefinedField(@FormatWith(ClassFormatter.class) Class<?> backend, @Cause Exception e);
@@ -998,11 +998,8 @@ public interface Log extends BasicLogger {
 	@Message(id = 333, value = "Cannot query: there aren't any mapped entity. Don't forget to add @Indexed to at least one class." )
 	SearchException queryWithNoIndexedType();
 
-	@Message(id = 334, value = "The simple query parser does not support empty queries.")
-	EmptyQueryException simpleQueryParserDoesNotSupportEmptyQueries();
-
-	@Message(id = 335, value = "Unable to build a Lucene query from the query string '%1$s'.")
-	EmptyQueryException unableToBuildLuceneQueryFromQueryString(String query);
+	@Message(id = 334, value = "The simple query parser does not support null queries.")
+	SearchException simpleQueryParserDoesNotSupportNullQueries();
 
 	@LogMessage(level = Level.DEBUG)
 	@Message(id = 336, value = "A file could not be deleted: likely lock contention. Not a problem for index replications as it will be attempted again in the future.")

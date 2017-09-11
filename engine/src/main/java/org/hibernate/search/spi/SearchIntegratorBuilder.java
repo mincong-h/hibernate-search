@@ -70,14 +70,15 @@ import org.hibernate.search.indexes.impl.IndexManagerHolder;
 import org.hibernate.search.indexes.spi.IndexManager;
 import org.hibernate.search.indexes.spi.IndexManagerType;
 import org.hibernate.search.indexes.spi.IndexNameNormalizer;
-import org.hibernate.search.spi.impl.ConcurrentIndexedTypeMap;
 import org.hibernate.search.spi.impl.ExtendedSearchIntegratorWithShareableState;
+import org.hibernate.search.spi.impl.IndexedTypeMaps;
 import org.hibernate.search.spi.impl.PojoIndexedTypeIdentifier;
 import org.hibernate.search.spi.impl.SearchFactoryState;
 import org.hibernate.search.spi.impl.TypeHierarchy;
 import org.hibernate.search.util.StringHelper;
 import org.hibernate.search.util.configuration.impl.ConfigurationParseHelper;
 import org.hibernate.search.util.impl.ClassLoaderHelper;
+import org.hibernate.search.util.impl.Closer;
 import org.hibernate.search.util.logging.impl.Log;
 import org.hibernate.search.util.logging.impl.LoggerFactory;
 
@@ -268,19 +269,16 @@ public class SearchIntegratorBuilder {
 	}
 
 	private void cleanupFactoryState() {
-		Worker worker = factoryState.getWorker();
-		if ( worker != null ) {
-			worker.close();
-		}
+		try ( Closer<RuntimeException> closer = new Closer<>() ) {
+			Worker worker = factoryState.getWorker();
+			if ( worker != null ) {
+				closer.push( worker::close );
+			}
 
-		factoryState.getAllIndexesManager().stop();
-
-		factoryState.getTimingSource().stop();
-
-		factoryState.getServiceManager().releaseAllServices();
-
-		for ( SearchIntegration integration : factoryState.getIntegrations().values() ) {
-			integration.close();
+			closer.push( factoryState.getAllIndexesManager()::stop );
+			closer.push( factoryState.getTimingSource()::stop );
+			closer.push( factoryState.getServiceManager()::releaseAllServices );
+			closer.pushAll( SearchIntegration::close, factoryState.getIntegrations().values() );
 		}
 	}
 
@@ -329,8 +327,8 @@ public class SearchIntegratorBuilder {
 		if ( rootFactory == null ) {
 			//set the mutable structure of factory state
 			rootFactory = new MutableSearchFactory();
-			factoryState.setDocumentBuildersIndexedEntities( new ConcurrentIndexedTypeMap<>() );
-			factoryState.setDocumentBuildersContainedEntities( new ConcurrentIndexedTypeMap<>() );
+			factoryState.setDocumentBuildersIndexedEntities( IndexedTypeMaps.concurrentHashMap() );
+			factoryState.setDocumentBuildersContainedEntities( IndexedTypeMaps.concurrentHashMap() );
 			factoryState.setConfiguredTypeHierarchy( new TypeHierarchy() );
 			factoryState.setIndexedTypeHierarchy( new TypeHierarchy() );
 			factoryState.setConfigurationProperties( cfg.getProperties() );
@@ -635,12 +633,6 @@ public class SearchIntegratorBuilder {
 		@Override
 		public ExtendedSearchIntegrator getUninitializedSearchIntegrator() {
 			return rootFactory;
-		}
-
-		@Override
-		@Deprecated
-		public String getIndexingStrategy() {
-			return factoryState.getIndexingMode().toExternalRepresentation();
 		}
 
 		@Override

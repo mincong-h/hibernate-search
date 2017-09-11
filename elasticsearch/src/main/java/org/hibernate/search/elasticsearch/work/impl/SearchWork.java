@@ -9,15 +9,14 @@ package org.hibernate.search.elasticsearch.work.impl;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
 
 import org.hibernate.search.elasticsearch.client.impl.ElasticsearchRequest;
 import org.hibernate.search.elasticsearch.client.impl.ElasticsearchResponse;
 import org.hibernate.search.elasticsearch.client.impl.Paths;
 import org.hibernate.search.elasticsearch.client.impl.URLEncodedString;
-import org.hibernate.search.elasticsearch.gson.impl.GsonProvider;
 import org.hibernate.search.elasticsearch.gson.impl.JsonAccessor;
 import org.hibernate.search.elasticsearch.logging.impl.Log;
-import org.hibernate.search.elasticsearch.util.impl.ElasticsearchClientUtils;
 import org.hibernate.search.elasticsearch.work.impl.builder.SearchWorkBuilder;
 import org.hibernate.search.exception.AssertionFailure;
 import org.hibernate.search.util.logging.impl.DefaultLogCategories;
@@ -38,15 +37,13 @@ public class SearchWork extends SimpleElasticsearchWork<SearchResult> {
 	}
 
 	@Override
-	protected void beforeExecute(ElasticsearchWorkExecutionContext executionContext, ElasticsearchRequest request) {
-		if ( QUERY_LOG.isDebugEnabled() ) {
-			GsonProvider gsonProvider = executionContext.getGsonProvider();
-			QUERY_LOG.executingElasticsearchQuery(
-					request.getPath(),
-					request.getParameters(),
-					ElasticsearchClientUtils.formatRequestData( gsonProvider, request )
-					);
-		}
+	protected CompletableFuture<?> beforeExecute(ElasticsearchWorkExecutionContext executionContext, ElasticsearchRequest request) {
+		QUERY_LOG.executingElasticsearchQuery(
+				request.getPath(),
+				request.getParameters(),
+				executionContext.getGsonProvider().getLogHelper().toString( request.getBodyParts() )
+				);
+		return super.beforeExecute( executionContext, request );
 	}
 
 	@Override

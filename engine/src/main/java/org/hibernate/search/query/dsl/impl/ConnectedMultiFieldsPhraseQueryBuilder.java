@@ -73,6 +73,7 @@ public class ConnectedMultiFieldsPhraseQueryBuilder implements PhraseTermination
 		// locally or not
 		if ( queryContext.getQueryAnalyzerReference().is( RemoteAnalyzerReference.class ) ) {
 			perFieldQuery = new RemotePhraseQuery( fieldName, phraseContext.getSlop(), sentence,
+					queryContext.getOriginalAnalyzerReference().unwrap( RemoteAnalyzerReference.class ),
 					queryContext.getQueryAnalyzerReference().unwrap( RemoteAnalyzerReference.class ) );
 		}
 		else {
@@ -164,13 +165,13 @@ public class ConnectedMultiFieldsPhraseQueryBuilder implements PhraseTermination
 					perFieldQuery = query;
 				}
 				else {
-					PhraseQuery query = new PhraseQuery();
-					query.setSlop( phraseContext.getSlop() );
+					PhraseQuery.Builder phraseBuilder = new PhraseQuery.Builder();
+					phraseBuilder.setSlop( phraseContext.getSlop() );
 					for ( Map.Entry<Integer, List<Term>> entry : termsPerPosition.entrySet() ) {
 						final List<Term> value = entry.getValue();
-						query.add( value.get( 0 ), entry.getKey() );
+						phraseBuilder.add( value.get( 0 ), entry.getKey() );
 					}
-					perFieldQuery = query;
+					perFieldQuery = phraseBuilder.build();
 				}
 			}
 		}

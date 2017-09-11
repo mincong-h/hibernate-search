@@ -23,6 +23,7 @@ import org.hibernate.criterion.Restrictions;
 import org.hibernate.engine.spi.SessionFactoryImplementor;
 import org.hibernate.engine.spi.SharedSessionContractImplementor;
 import org.hibernate.internal.CriteriaImpl;
+import org.hibernate.metamodel.spi.MetamodelImplementor;
 import org.hibernate.search.cfg.spi.IdUniquenessResolver;
 import org.hibernate.search.engine.integration.impl.ExtendedSearchIntegrator;
 import org.hibernate.search.engine.service.spi.ServiceManager;
@@ -33,6 +34,7 @@ import org.hibernate.search.query.engine.spi.TimeoutManager;
 import org.hibernate.search.spi.IndexedTypeIdentifier;
 import org.hibernate.search.spi.IndexedTypeSet;
 import org.hibernate.search.spi.InstanceInitializer;
+import org.hibernate.search.spi.impl.PojoIndexedTypeIdentifier;
 import org.hibernate.search.util.impl.ReflectionHelper;
 import org.hibernate.search.util.logging.impl.Log;
 import org.hibernate.search.util.logging.impl.LoggerFactory;
@@ -221,16 +223,16 @@ public class CriteriaObjectInitializer implements ObjectInitializer {
 	}
 
 	private Class<?> getRootEntityType(SessionFactoryImplementor sessionFactory, IndexedTypeIdentifier indexedTypeIdentifier) {
-		String entityName = sessionFactory.getClassMetadata( indexedTypeIdentifier.getPojoType() ).getEntityName();
-		String rootEntityName = sessionFactory.getMetamodel().entityPersister( entityName ).getRootEntityName();
-
-		return sessionFactory.getEntityPersister( rootEntityName ).getMappedClass();
+		MetamodelImplementor metamodel = sessionFactory.getMetamodel();
+		String entityName = indexedTypeIdentifier.getName();
+		String rootEntityName = metamodel.entityPersister( entityName ).getRootEntityName();
+		return metamodel.entityPersister( rootEntityName ).getMappedClass();
 	}
 
 	private void addToIdSpace(Map<Class<?>, EntityInfoIdSpace> idSpaces, EntityInfo entityInfo, IdUniquenessResolver resolver, SessionFactoryImplementor sessionFactory) {
 		// add to existing id space if possible
 		for ( Entry<Class<?>, EntityInfoIdSpace> idSpace : idSpaces.entrySet() ) {
-			if ( resolver.areIdsUniqueForClasses( entityInfo.getType().getPojoType(), idSpace.getKey() ) ) {
+			if ( resolver.areIdsUniqueForClasses( entityInfo.getType(), new PojoIndexedTypeIdentifier( idSpace.getKey() ) ) ) {
 				idSpace.getValue().add( entityInfo );
 				return;
 			}
@@ -271,12 +273,12 @@ public class CriteriaObjectInitializer implements ObjectInitializer {
 		private EntityInfoIdSpace(Class<?> rootType, EntityInfo entityInfo) {
 			this.rootType = rootType;
 			this.entityInfos.add( entityInfo );
-			this.mostSpecificEntityType = entityInfo.getClazz();
+			this.mostSpecificEntityType = entityInfo.getType().getPojoType();
 		}
 
 		private void add(EntityInfo entityInfo) {
 			entityInfos.add( entityInfo );
-			mostSpecificEntityType = getMostSpecificCommonSuperClass( mostSpecificEntityType, entityInfo.getClazz() );
+			mostSpecificEntityType = getMostSpecificCommonSuperClass( mostSpecificEntityType, entityInfo.getType().getPojoType() );
 		}
 
 		private Class<?> getMostSpecificCommonSuperClass(Class<?> class1, Class<?> class2) {

@@ -78,8 +78,8 @@ public class WorkDuplicationTest extends SearchTestBase {
 		// Search and the record via Lucene directly
 		tx = s.beginTransaction();
 
-		String indexName = getExtendedSearchIntegrator().getIndexBinding( SpecialPerson.class )
-				.getIndexManagers()[0].getIndexName();
+		String indexName = getExtendedSearchIntegrator().getIndexBindings().get( SpecialPerson.class )
+				.getIndexManagerSelector().all().iterator().next().getIndexName();
 
 			// we have to test using Lucene directly since query loaders will ignore hits for which there is no
 			// database entry

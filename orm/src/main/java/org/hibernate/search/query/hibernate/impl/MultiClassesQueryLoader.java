@@ -14,7 +14,7 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 
-import org.hibernate.Session;
+import org.hibernate.engine.spi.SessionImplementor;
 import org.hibernate.search.engine.integration.impl.ExtendedSearchIntegrator;
 import org.hibernate.search.engine.spi.EntityIndexBinding;
 import org.hibernate.search.exception.AssertionFailure;
@@ -28,14 +28,14 @@ import org.hibernate.search.spi.IndexedTypeIdentifier;
  * @author Emmanuel Bernard
  */
 public class MultiClassesQueryLoader extends AbstractLoader {
-	private Session session;
+	private SessionImplementor session;
 	private ExtendedSearchIntegrator extendedIntegrator;
 	private List<RootEntityMetadata> entityMetadata;
 	private TimeoutManager timeoutManager;
 	private ObjectInitializer objectInitializer;
 
 	@Override
-	public void init(Session session,
+	public void init(SessionImplementor session,
 					ExtendedSearchIntegrator extendedIntegrator,
 					ObjectInitializer objectInitializer,
 					TimeoutManager timeoutManager) {
@@ -88,7 +88,7 @@ public class MultiClassesQueryLoader extends AbstractLoader {
 		Map<RootEntityMetadata, List<EntityInfo>> entityInfoBuckets = new HashMap<>( entityMetadata.size() );
 		for ( EntityInfo entityInfo : entityInfos ) {
 			boolean found = false;
-			final Class<?> clazz = entityInfo.getClazz();
+			final Class<?> clazz = entityInfo.getType().getPojoType();
 			for ( RootEntityMetadata rootEntityInfo : entityMetadata ) {
 				if ( rootEntityInfo.rootEntity == clazz || rootEntityInfo.mappedSubclasses.contains( clazz ) ) {
 					List<EntityInfo> bucket = entityInfoBuckets.get( rootEntityInfo );
@@ -99,7 +99,7 @@ public class MultiClassesQueryLoader extends AbstractLoader {
 					bucket.add( entityInfo );
 					found = true;
 					idToObjectMap.put(
-							new EntityInfoLoadKey( entityInfo.getClazz(), entityInfo.getId() ),
+							new EntityInfoLoadKey( entityInfo.getType().getPojoType(), entityInfo.getId() ),
 							ObjectInitializer.ENTITY_NOT_YET_INITIALIZED
 					);
 					break; //we stop looping for the right bucket
@@ -144,7 +144,7 @@ public class MultiClassesQueryLoader extends AbstractLoader {
 
 		RootEntityMetadata(Class<?> rootEntity, ExtendedSearchIntegrator extendedIntegrator) {
 			this.rootEntity = rootEntity;
-			EntityIndexBinding provider = extendedIntegrator.getIndexBinding( rootEntity );
+			EntityIndexBinding provider = extendedIntegrator.getIndexBindings().get( rootEntity );
 			if ( provider == null ) {
 				throw new AssertionFailure( "Provider not found for class: " + rootEntity );
 			}

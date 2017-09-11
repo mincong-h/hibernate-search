@@ -8,7 +8,7 @@ package org.hibernate.search.jsr352.massindexing.impl.steps.lucene;
 
 import java.io.Serializable;
 import java.util.List;
-
+import java.util.Set;
 import javax.batch.api.BatchProperty;
 import javax.batch.api.chunk.AbstractItemWriter;
 import javax.batch.runtime.context.JobContext;
@@ -24,10 +24,12 @@ import org.hibernate.search.backend.impl.StreamingOperationExecutorSelector;
 import org.hibernate.search.engine.spi.EntityIndexBinding;
 import org.hibernate.search.exception.AssertionFailure;
 import org.hibernate.search.indexes.spi.IndexManager;
+import org.hibernate.search.indexes.spi.IndexManagerSelector;
 import org.hibernate.search.jsr352.logging.impl.Log;
 import org.hibernate.search.jsr352.massindexing.impl.JobContextData;
 import org.hibernate.search.jsr352.massindexing.impl.util.MassIndexingPartitionProperties;
-import org.hibernate.search.store.IndexShardingStrategy;
+import org.hibernate.search.spi.IndexedTypeIdentifier;
+import org.hibernate.search.spi.impl.PojoIndexedTypeIdentifier;
 import org.hibernate.search.util.logging.impl.LoggerFactory;
 
 /**
@@ -62,7 +64,7 @@ public class LuceneDocWriter extends AbstractItemWriter {
 
 	private IndexScope indexScope;
 
-	private IndexShardingStrategy shardingStrategy;
+	private IndexManagerSelector indexManagerSelector;
 
 	private WriteMode writeMode;
 
@@ -90,9 +92,10 @@ public class LuceneDocWriter extends AbstractItemWriter {
 		JobContextData jobData = (JobContextData) jobContext.getTransientUserData();
 
 		Class<?> entityType = jobData.getEntityType( entityName );
+		IndexedTypeIdentifier typeIdentifier = new PojoIndexedTypeIdentifier( entityType );
 		EntityIndexBinding entityIndexBinding = jobData.getSearchIntegrator()
-				.getIndexBinding( entityType );
-		shardingStrategy = entityIndexBinding.getSelectionStrategy();
+				.getIndexBinding( typeIdentifier );
+		indexManagerSelector = entityIndexBinding.getIndexManagerSelector();
 	}
 
 	/**
@@ -114,7 +117,7 @@ public class LuceneDocWriter extends AbstractItemWriter {
 		 * which is necessary because the runtime will perform a checkpoint
 		 * just after we return from this method.
 		 */
-		IndexManager[] indexManagers = shardingStrategy.getIndexManagersForAllShards();
+		Set<IndexManager> indexManagers = indexManagerSelector.all();
 		for ( IndexManager im : indexManagers ) {
 			im.performStreamOperation( FlushLuceneWork.INSTANCE, null, false );
 		}
@@ -140,7 +143,7 @@ public class LuceneDocWriter extends AbstractItemWriter {
 				StreamingOperationExecutorSelector.INSTANCE, null );
 		executor.performStreamOperation(
 				work,
-				shardingStrategy,
+				indexManagerSelector,
 				null, // monitor,
 				FORCE_ASYNC );
 	}

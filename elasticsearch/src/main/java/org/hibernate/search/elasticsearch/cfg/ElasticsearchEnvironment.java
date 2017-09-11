@@ -37,6 +37,7 @@ public final class ElasticsearchEnvironment {
 		public static final int SCROLL_BACKTRACKING_WINDOW_SIZE = 10_000;
 		public static final int SCROLL_FETCH_SIZE = 1_000;
 		public static final int SCROLL_TIMEOUT = 60;
+		public static final boolean LOG_JSON_PRETTY_PRINTING = false;
 	}
 
 	/**
@@ -277,17 +278,20 @@ public final class ElasticsearchEnvironment {
 	public static final String SCROLL_TIMEOUT = "elasticsearch.scroll_timeout";
 
 	/**
-	 * Equivalent to elasticsearch "dynamic", define what to do when a document contains a field which was not declared
-	 * in the index schema.
+	 * Equivalent to elasticsearch "dynamic" mapping attribute, define what to do when an indexed document
+	 * contains a field which was not declared in the index schema.
 	 * <p>
 	 * Possible values are:
 	 * <ul>
-	 * <li>{@code true}: Add new fields dynamically</li>
-	 * <li>{@code false}: Ignore new fields</li>
-	 * <li>{@code strict}: Throw an exception</li>
+	 * <li>{@code true}: Add unknown fields to the schema dynamically</li>
+	 * <li>{@code false}: Ignore unknown fields</li>
+	 * <li>{@code strict}: Throw an exception on unknown fields</li>
 	 * </ul>
 	 * <p>
 	 * Defaults to {@code strict}.
+	 * <p>
+	 * Can be given globally (e.g. {@code hibernate.search.default.elasticsearch.dynamic_mapping=false}) or for
+	 * specific indexes (e.g. {@code hibernate.search.someindex.elasticsearch.dynamic_mapping=true}).
 	 */
 	public static final String DYNAMIC_MAPPING = "elasticsearch.dynamic_mapping";
 
@@ -297,6 +301,18 @@ public final class ElasticsearchEnvironment {
 	 * The value must be the fully-qualified name of a class implementing {@link ElasticsearchAnalysisDefinitionProvider}.
 	 */
 	public static final String ANALYSIS_DEFINITION_PROVIDER = "hibernate.search.elasticsearch.analysis_definition_provider";
+
+	/**
+	 * Whether JSON included in logs should be pretty-printed (indented, with line breaks).
+	 * <p>
+	 * A boolean value (true, false) is expected.
+	 * <p>
+	 * Defaults to {@link Defaults#LOG_JSON_PRETTY_PRINTING}.
+	 * <p>
+	 * Can only be given <b>globally</b> (e.g.
+	 * {@code hibernate.search.elasticsearch.log.json_pretty_printing=true}).
+	 */
+	public static final String LOG_JSON_PRETTY_PRINTING = "elasticsearch.log.json_pretty_printing";
 
 	private ElasticsearchEnvironment() {
 	}

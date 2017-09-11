@@ -203,8 +203,8 @@ public class DatabaseMultitenancyTest extends SearchTestBase {
 		session.createIndexer( entityType ).purgeAllOnStart( true ).startAndWait();
 		session.close();
 
-		String indexName = getExtendedSearchIntegrator().getIndexBinding( entityType )
-				.getIndexManagers()[0].getIndexName();
+		String indexName = getExtendedSearchIntegrator().getIndexBindings().get( entityType )
+				.getIndexManagerSelector().all().iterator().next().getIndexName();
 
 		assertThat( getNumberOfDocumentsInIndexByQuery( indexName, DocumentBuilderIndexedEntity.TENANT_ID_FIELDNAME, tenantId ) ).isGreaterThan( 0 );
 	}
@@ -215,8 +215,8 @@ public class DatabaseMultitenancyTest extends SearchTestBase {
 		session.flushToIndexes();
 		session.close();
 
-		String indexName = getExtendedSearchIntegrator().getIndexBinding( entityType )
-				.getIndexManagers()[0].getIndexName();
+		String indexName = getExtendedSearchIntegrator().getIndexBindings().get( entityType )
+				.getIndexManagerSelector().all().iterator().next().getIndexName();
 
 		assertThat( getNumberOfDocumentsInIndexByQuery( indexName, DocumentBuilderIndexedEntity.TENANT_ID_FIELDNAME, tenantId ) ).isEqualTo( 0 );
 	}

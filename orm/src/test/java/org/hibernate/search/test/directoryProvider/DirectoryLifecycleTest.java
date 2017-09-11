@@ -9,6 +9,8 @@ package org.hibernate.search.test.directoryProvider;
 
 import static org.fest.assertions.Assertions.assertThat;
 
+import java.util.Set;
+
 import org.hibernate.search.engine.spi.EntityIndexBinding;
 import org.hibernate.search.indexes.spi.DirectoryBasedIndexManager;
 import org.hibernate.search.indexes.spi.IndexManager;
@@ -43,11 +45,11 @@ public class DirectoryLifecycleTest {
 		CloseCheckingDirectoryProvider directoryProvider;
 		try {
 			SearchIntegrator integrator = builder.getSearchFactory().unwrap( SearchIntegrator.class );
-			EntityIndexBinding snowIndexBinder = integrator.getIndexBinding( SnowStorm.class );
-			IndexManager[] indexManagers = snowIndexBinder.getIndexManagers();
-			assertThat( indexManagers.length ).isEqualTo( 1 );
-			assertThat( indexManagers[0] ).isInstanceOf( DirectoryBasedIndexManager.class );
-			DirectoryBasedIndexManager dbBasedManager = (DirectoryBasedIndexManager)indexManagers[0];
+			EntityIndexBinding snowIndexBinder = integrator.getIndexBindings().get( SnowStorm.class );
+			Set<IndexManager> indexManagers = snowIndexBinder.getIndexManagerSelector().all();
+			assertThat( indexManagers.size() ).isEqualTo( 1 );
+			assertThat( indexManagers.iterator().next() ).isInstanceOf( DirectoryBasedIndexManager.class );
+			DirectoryBasedIndexManager dbBasedManager = (DirectoryBasedIndexManager)indexManagers.iterator().next();
 			assertThat( dbBasedManager.getDirectoryProvider() ).isInstanceOf( CloseCheckingDirectoryProvider.class );
 			directoryProvider = (CloseCheckingDirectoryProvider) dbBasedManager.getDirectoryProvider();
 			assertThat( directoryProvider.isInitialized() ).isTrue();

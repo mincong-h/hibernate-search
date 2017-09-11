@@ -6,11 +6,9 @@
  */
 package org.hibernate.search.test.engine.worker;
 
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
 
+import org.apache.log4j.Level;
 import org.apache.lucene.index.Term;
 import org.apache.lucene.search.Query;
 import org.apache.lucene.search.TermQuery;
@@ -19,55 +17,81 @@ import org.hibernate.SessionFactory;
 import org.hibernate.Transaction;
 import org.hibernate.resource.transaction.spi.TransactionStatus;
 import org.hibernate.search.Search;
+import org.hibernate.search.indexes.spi.IndexManager;
+import org.hibernate.search.spi.IndexedTypeIdentifier;
+import org.hibernate.search.spi.impl.PojoIndexedTypeIdentifier;
 import org.hibernate.search.test.SearchTestBase;
+import org.hibernate.search.test.util.impl.ExpectedLog4jLog;
+import org.hibernate.search.testsupport.concurrency.ConcurrentRunner;
 import org.junit.Assert;
+import org.junit.Rule;
 import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.junit.runners.JUnit4;
 
 /**
  * @author Emmanuel Bernard
  * @author Sanne Grinovero
  */
+@RunWith(JUnit4.class) // CustomRunner messes with @Rule
 public class WorkerTestCase extends SearchTestBase {
+
+	@Rule
+	public ExpectedLog4jLog logged = ExpectedLog4jLog.create();
 
 	@Test
 	public void testConcurrency() throws Exception {
-		final AtomicBoolean allFine = new AtomicBoolean( true );
-		int nThreads = 15;
-		ExecutorService es = Executors.newFixedThreadPool( nThreads );
-		Work work = new Work( getSessionFactory(), allFine, isWorkerSync() );
-		ReverseWork reverseWork = new ReverseWork( getSessionFactory(), allFine );
-		long start = System.nanoTime();
+		int numberOfThreads = 15;
 		int iteration = 100;
-		for ( int i = 0; i < iteration; i++ ) {
-			es.execute( work );
-			es.execute( reverseWork );
-		}
-		es.shutdown();
-		es.awaitTermination( 100, TimeUnit.MINUTES );
-		getSessionFactory().close();
-		Assert.assertTrue(
-				"Something was wrong in the concurrent threads, please check logs for stacktraces",
-				allFine.get()
-		);
+
+		Work work = new Work( getSessionFactory(), isWorkerSync() );
+		ReverseWork reverseWork = new ReverseWork( getSessionFactory() );
+
+		long start = System.nanoTime();
+
+		// Expect 0 failure in the backend threads
+		logged.expectLevelMissing( Level.ERROR );
+
+		new ConcurrentRunner(
+				iteration * 2,
+				numberOfThreads,
+				i -> ( i % 2 == 0 ) ? work : reverseWork
+			)
+				.setFinalizingTask( () -> {
+					if ( !isWorkerSync() ) {
+						awaitProcessingCompletion();
+					}
+				} )
+				.setTimeout( 1, TimeUnit.MINUTES )
+				.execute();
+
 		System.out.println(
-				iteration + " iterations (8 tx per iteration) in " + nThreads + " threads: "
-						+ TimeUnit.NANOSECONDS.toMillis( System.nanoTime() - start )
+				iteration + " iterations (8 tx per iteration) in " + numberOfThreads + " threads: "
+						+ TimeUnit.NANOSECONDS.toMillis( System.nanoTime() - start ) + "ms"
 		);
+	}
+
+	protected void awaitProcessingCompletion() {
+		for ( Class<?> clazz : getAnnotatedClasses() ) {
+			IndexedTypeIdentifier typeId = PojoIndexedTypeIdentifier.convertFromLegacy( clazz );
+			for ( IndexManager indexManager : getExtendedSearchIntegrator().getIndexBinding( typeId ).getIndexManagerSelector().all() ) {
+				indexManager.awaitAsyncProcessingCompletion();
+			}
+		}
 	}
 
 	protected static final class Work implements Runnable {
 		private final SessionFactory sf;
-		private final AtomicBoolean allFine;
 		private final boolean isWorkerSync;
 
-		public Work(SessionFactory sf, AtomicBoolean allFine, boolean isWorkerSync) {
+		public Work(SessionFactory sf, boolean isWorkerSync) {
 			this.sf = sf;
-			this.allFine = allFine;
 			this.isWorkerSync = isWorkerSync;
 		}
 
 		@Override
 		public void run() {
+			RuntimeException exception = null;
 			Session s = null;
 			Transaction tx = null;
 			try {
@@ -120,23 +144,19 @@ public class WorkerTestCase extends SearchTestBase {
 				tx.commit();
 				s.close();
 			}
-			catch (Throwable t) {
-				allFine.set( false );
-				t.printStackTrace();
+			catch (RuntimeException e) {
+				exception = e;
 			}
 			finally {
-				try {
-					if ( tx != null && tx.getStatus() == TransactionStatus.ACTIVE ) {
-						tx.rollback();
-					}
-					if ( s != null && s.isOpen() ) {
-						s.close();
-					}
+				if ( tx != null && tx.getStatus() == TransactionStatus.ACTIVE ) {
+					exception = tryClose( exception, tx::rollback );
 				}
-				catch (Throwable t) {
-					allFine.set( false );
-					t.printStackTrace();
+				if ( s != null && s.isOpen() ) {
+					exception = tryClose( exception, s::close );
 				}
+			}
+			if ( exception != null ) {
+				throw exception;
 			}
 		}
 
@@ -144,18 +164,19 @@ public class WorkerTestCase extends SearchTestBase {
 
 	protected static final class ReverseWork implements Runnable {
 		private final SessionFactory sf;
-		private final AtomicBoolean allFine;
 
-		public ReverseWork(SessionFactory sf, AtomicBoolean allFine) {
+		public ReverseWork(SessionFactory sf) {
 			this.sf = sf;
-			this.allFine = allFine;
 		}
 
 		@Override
 		public void run() {
+			RuntimeException exception = null;
+			Session s = null;
+			Transaction tx = null;
 			try {
-				Session s = sf.openSession();
-				Transaction tx = s.beginTransaction();
+				s = sf.openSession();
+				tx = s.beginTransaction();
 				Employer er = new Employer();
 				er.setName( "RH" );
 				s.persist( er );
@@ -183,9 +204,35 @@ public class WorkerTestCase extends SearchTestBase {
 				tx.commit();
 				s.close();
 			}
-			catch (Throwable t) {
-				allFine.set( false );
-				t.printStackTrace();
+			catch (RuntimeException e) {
+				exception = e;
+			}
+			finally {
+				if ( tx != null && tx.getStatus() == TransactionStatus.ACTIVE ) {
+					exception = tryClose( exception, tx::rollback );
+				}
+				if ( s != null && s.isOpen() ) {
+					exception = tryClose( exception, s::close );
+				}
+			}
+			if ( exception != null ) {
+				throw exception;
+			}
+		}
+	}
+
+	private static RuntimeException tryClose(RuntimeException exception, Runnable runnable) {
+		try {
+			runnable.run();
+			return exception;
+		}
+		catch (RuntimeException e) {
+			if ( exception != null ) {
+				exception.addSuppressed( e );
+				return exception;
+			}
+			else {
+				return e;
 			}
 		}
 	}

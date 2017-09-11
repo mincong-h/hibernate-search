@@ -28,17 +28,20 @@
         <module>backends/jgroups</module>
         <module>backends/jms</module>
         <module>elasticsearch</module>
+        <module>elasticsearch-aws</module>
         <module>orm</module>
         <module>jsr352</module>
         <module>testing</module>
         <module>infinispan</module>
         <module>modules</module>
+        <module>integrationtest/elasticsearch</module>
         <module>integrationtest/jms</module>
         <module>integrationtest/narayana</module>
         <module>integrationtest/spring</module>
         <module>integrationtest/osgi/karaf-features</module>
-        <module>integrationtest/sandbox</module>
-        <module>integrationtest/engine-performance</module>
+        <module>integrationtest/performance/sandbox</module>
+        <module>integrationtest/performance/engine-lucene</module>
+        <module>integrationtest/performance/engine-elasticsearch</module>
         <module>integrationtest/jsr352-performance</module>
     </modules>
 
@@ -205,7 +208,7 @@
         <commonsCompressVersion>1.5</commonsCompressVersion>
         <commonsIoVersion>2.1</commonsIoVersion>
         <jbossTransactionApiVersion>1.0.0.Final</jbossTransactionApiVersion>
-        <commonsLoggingVersion>1.1.1</commonsLoggingVersion>
+        <commonsLoggingVersion>1.1.3</commonsLoggingVersion>
         <activeMQVersion>5.13.3</activeMQVersion>
         <commonsLangVersion>2.6</commonsLangVersion>
         <commonsLang3Version>3.5</commonsLang3Version>
@@ -214,20 +217,21 @@
         <commonsCodecVersion>1.10</commonsCodecVersion>
 
         <!-- Elasticsearch -->
-        <elasticsearchClientVersion>5.4.1</elasticsearchClientVersion>
-        <elasticsearchSnifferVersion>5.4.1</elasticsearchSnifferVersion>
+        <elasticsearchClientVersion>5.5.2</elasticsearchClientVersion>
+        <elasticsearchSnifferVersion>5.5.2</elasticsearchSnifferVersion>
         <elasticsearchGsonVersion>2.8.0</elasticsearchGsonVersion>
+        <elasticsearchAWSV4SignerVersion>1.3</elasticsearchAWSV4SignerVersion>
         
         <!-- Tests -->
         <!-- Fixes dependency convergence within Wiremock, see below -->
-        <jacksonVersion>2.6.1</jacksonVersion>
+        <jacksonVersion>2.8.6</jacksonVersion>
 
         <!-- Integration tests -->
         <arquillianVersion>1.1.11.Final</arquillianVersion>
         <arquillianContainerVersion>2.0.0.Final</arquillianContainerVersion>
         <shrinkwrapResolverVersion>2.2.2</shrinkwrapResolverVersion>
         <wildflyVersion>10.1.0.Final</wildflyVersion>
-        <jmhVersion>1.11.2</jmhVersion>
+        <jmhVersion>1.19</jmhVersion>
         
         <!-- Elasticsearch -->
         <test.elasticsearch.host.url>http://localhost:9200</test.elasticsearch.host.url>
@@ -247,8 +251,7 @@
             overridden by a CI job of the Checkstyle project so that they can
             check for regressions. Which is obviously good for us, too.
          -->
-        <!-- Version 7.5 suffers from a bug that affects us: https://github.com/checkstyle/checkstyle/issues/3776 -->
-        <puppycrawl.checkstyle.version>7.4</puppycrawl.checkstyle.version>
+        <puppycrawl.checkstyle.version>8.0</puppycrawl.checkstyle.version>
 
         <!-- Asciidoctor -->
         <hibernate-asciidoctor-theme.version>1.0.1.Final</hibernate-asciidoctor-theme.version>
@@ -567,6 +570,11 @@
             </dependency>
             <dependency>
                 <groupId>org.hibernate</groupId>
+                <artifactId>hibernate-search-elasticsearch-aws</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.hibernate</groupId>
                 <artifactId>hibernate-search-jsr352-core</artifactId>
                 <version>${project.version}</version>
             </dependency>
@@ -688,6 +696,11 @@
                 <groupId>org.easytesting</groupId>
                 <artifactId>fest-assert</artifactId>
                 <version>1.4</version>
+            </dependency>
+            <dependency>
+                <groupId>org.skyscreamer</groupId>
+                <artifactId>jsonassert</artifactId>
+                <version>1.2.3</version>
             </dependency>
             <dependency>
                 <groupId>com.github.tomakehurst</groupId>
@@ -1104,7 +1117,7 @@
                 <plugin>
                     <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-javadoc-plugin</artifactId>
-                    <version>2.10.4</version>
+                    <version>3.0.0-M1</version>
                     <configuration>
                         <!-- Fail on error alternative -->
                         <!-- <additionalparam>-Xdoclint:none</additionalparam> -->
@@ -1198,7 +1211,7 @@
                 <plugin>
                     <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-enforcer-plugin</artifactId>
-                    <version>1.4.1</version>
+                    <version>3.0.0-M1</version>
                 </plugin>
                 <plugin>
                     <groupId>de.thetaphi</groupId>
@@ -1490,6 +1503,11 @@ org.hibernate.search.spi.SearchIntegratorBuilder#buildSearchIntegrator()
                         <httpPort>9200</httpPort>
                     </configuration>
                 </plugin>
+                <plugin>
+                    <groupId>org.bitstrings.maven.plugins</groupId>
+                    <artifactId>dependencypath-maven-plugin</artifactId>
+                    <version>1.1.1</version>
+                </plugin>
             </plugins>
         </pluginManagement>
     </build>
@@ -1600,7 +1618,7 @@ org.hibernate.search.spi.SearchIntegratorBuilder#buildSearchIntegrator()
                 <module>documentation</module>
                 <module>integrationtest/wildfly</module>
                 <module>integrationtest/osgi/karaf-it</module>
-                <module>integrationtest/performance</module>
+                <module>integrationtest/performance/orm</module>
             </modules>
         </profile>
 
@@ -1620,6 +1638,36 @@ org.hibernate.search.spi.SearchIntegratorBuilder#buildSearchIntegrator()
             <properties>
                 <org.hibernate.search.enable_performance_tests>true</org.hibernate.search.enable_performance_tests>
             </properties>
+        </profile>
+
+        <profile>
+            <id>IDEA</id>
+            <!--
+            Dependencies to allow easy project import in IntelliJ IDEA.
+            These should not be listed as project dependencies to users
+            but are necessary during compile time as they include the
+            JBoss Logger annotation processor.
+            -->
+            <activation>
+                <!-- This is a trick to have the profile automatically activated by IDEA -->
+                <property>
+                    <name>idea.maven.embedder.version</name>
+                </property>
+            </activation>
+            <dependencies>
+                <dependency>
+                    <groupId>org.jboss.logging</groupId>
+                    <artifactId>jboss-logging-processor</artifactId>
+                    <version>${jbossLoggingProcessorVersion}</version>
+                    <scope>compile</scope>
+                </dependency>
+                <dependency>
+                    <groupId>javax.annotation</groupId>
+                    <artifactId>jsr250-api</artifactId>
+                    <version>1.0</version>
+                    <scope>compile</scope>
+                </dependency>
+            </dependencies>
         </profile>
 
         <!-- ====================================== -->
@@ -1724,7 +1772,7 @@ org.hibernate.search.spi.SearchIntegratorBuilder#buildSearchIntegrator()
             <id>elasticsearch-2.2</id>
             <properties>
                 <test.elasticsearch.mavenPlugin.version>2.2</test.elasticsearch.mavenPlugin.version>
-                <test.elasticsearch.host.version>2.4.4</test.elasticsearch.host.version>
+                <test.elasticsearch.host.version>2.4.6</test.elasticsearch.host.version>
             </properties>
             <build>
                 <pluginManagement>
@@ -1839,14 +1887,14 @@ org.hibernate.search.spi.SearchIntegratorBuilder#buildSearchIntegrator()
         <profile>
             <id>elasticsearch-5.2</id>
             <activation>
-                <!-- Activate by default, i.e. if testElasticsearchVersion has not been defined explicitly -->
+                <!-- Activate by default, i.e. if test.elasticsearch.host.version has not been defined explicitly -->
                 <property>
-                    <name>!test.elasticsearch.mavenPlugin.version</name>
+                    <name>!test.elasticsearch.host.version</name>
                 </property>
             </activation>
             <properties>
                 <test.elasticsearch.mavenPlugin.version>5.7</test.elasticsearch.mavenPlugin.version>
-                <test.elasticsearch.host.version>5.4.1</test.elasticsearch.host.version>
+                <test.elasticsearch.host.version>5.5.2</test.elasticsearch.host.version>
             </properties>
             <build>
                 <pluginManagement>
@@ -1936,13 +1984,14 @@ org.hibernate.search.spi.SearchIntegratorBuilder#buildSearchIntegrator()
             ###################################################################
         -->
 
-        <!-- The MySQL 5.1 test envionment -->
+        <!-- The MySQL 5.1 test environment -->
         <profile>
             <id>mysql51</id>
             <dependencies>
                 <dependency>
                     <groupId>mysql</groupId>
                     <artifactId>mysql-connector-java</artifactId>
+                    <!-- Version 6.0.5 fails with a ArrayIndexOutOfBoundsException during connection, so we'll stick to 5.x for now -->
                     <version>5.1.13</version>
                     <scope>test</scope>
                 </dependency>
@@ -1962,14 +2011,14 @@ org.hibernate.search.spi.SearchIntegratorBuilder#buildSearchIntegrator()
             <id>postgresql84</id>
             <dependencies>
                 <dependency>
-                    <groupId>postgresql</groupId>
+                    <groupId>org.postgresql</groupId>
                     <artifactId>postgresql</artifactId>
-                    <version>9.0-801.jdbc4</version>
+                    <version>42.1.1</version>
                     <scope>test</scope>
                 </dependency>
             </dependencies>
             <properties>
-                <db.dialect>org.hibernate.dialect.PostgreSQLDialect</db.dialect>
+                <db.dialect>org.hibernate.dialect.PostgreSQL82Dialect</db.dialect>
                 <jdbc.driver>org.postgresql.Driver</jdbc.driver>
                 <jdbc.url>jdbc:postgresql://notinstalled.lab.eng.bos.redhat.com:5432:searctru</jdbc.url>
                 <jdbc.user>searctru</jdbc.user>
@@ -1985,7 +2034,8 @@ org.hibernate.search.spi.SearchIntegratorBuilder#buildSearchIntegrator()
                 <dependency>
                     <groupId>org.postgresql</groupId>
                     <artifactId>postgresql</artifactId>
-                    <version>9.3-1103-jdbc41</version>
+                    <version>42.1.1</version>
+                    <scope>test</scope>
                 </dependency>
             </dependencies>
             <properties>
@@ -2024,11 +2074,19 @@ org.hibernate.search.spi.SearchIntegratorBuilder#buildSearchIntegrator()
             Then, those with commercial drivers
             ###################################################################
         -->
+        <!--
+             Those drivers are not available on public repos.
+             In CI jobs, we use internal build tools to fetch the drivers
+             and make the jars available to the build.
+             Thus, the maven coordinates of the drivers below are fake.
+             See https://svn.devel.redhat.com/repos/jboss-qa/hudson/config_repository/scripts/groovy.classes/hudson/util/JDBCLoader.groovy
+        -->
 
-        <!-- The DB2 9.7 test envionment (using 9x drivers)-->
+        <!-- The DB2 9.7 test environment (using 9x drivers)-->
         <profile>
             <id>db2-97</id>
             <dependencies>
+                <!-- These maven coordinates are fake (see above) -->
                 <dependency>
                     <groupId>jdbcdrivers</groupId>
                     <artifactId>db2-97</artifactId>
@@ -2046,10 +2104,11 @@ org.hibernate.search.spi.SearchIntegratorBuilder#buildSearchIntegrator()
             </properties>
         </profile>
 
-        <!-- The Oracle11g test envionment -->
+        <!-- The Oracle11g test environment -->
         <profile>
             <id>oracle11gR1</id>
             <dependencies>
+                <!-- These maven coordinates are fake (see above) -->
                 <dependency>
                     <groupId>jdbcdrivers</groupId>
                     <artifactId>oracle</artifactId>
@@ -2070,6 +2129,7 @@ org.hibernate.search.spi.SearchIntegratorBuilder#buildSearchIntegrator()
         <profile>
             <id>oracle11gR2</id>
             <dependencies>
+                <!-- These maven coordinates are fake (see above) -->
                 <dependency>
                     <groupId>jdbcdrivers</groupId>
                     <artifactId>oracle</artifactId>
@@ -2087,10 +2147,11 @@ org.hibernate.search.spi.SearchIntegratorBuilder#buildSearchIntegrator()
             </properties>
         </profile>
 
-        <!-- The Oracle11gRAC test envionment -->
+        <!-- The Oracle11gRAC test environment -->
         <profile>
             <id>oracle11gR1RAC</id>
             <dependencies>
+                <!-- These maven coordinates are fake (see above) -->
                 <dependency>
                     <groupId>jdbcdrivers</groupId>
                     <artifactId>oracle</artifactId>
@@ -2112,6 +2173,7 @@ org.hibernate.search.spi.SearchIntegratorBuilder#buildSearchIntegrator()
         <profile>
             <id>oracle11gR2RAC</id>
             <dependencies>
+                <!-- These maven coordinates are fake (see above) -->
                 <dependency>
                     <groupId>jdbcdrivers</groupId>
                     <artifactId>oracle</artifactId>
@@ -2135,6 +2197,7 @@ org.hibernate.search.spi.SearchIntegratorBuilder#buildSearchIntegrator()
         <profile>
             <id>sybase155</id>
             <dependencies>
+                <!-- These maven coordinates are fake (see above) -->
                 <dependency>
                     <groupId>jdbcdrivers</groupId>
                     <artifactId>sybase</artifactId>
@@ -2154,6 +2217,7 @@ org.hibernate.search.spi.SearchIntegratorBuilder#buildSearchIntegrator()
         <profile>
             <id>sybase155-jtds</id>
             <dependencies>
+                <!-- These maven coordinates are fake (see above) -->
                 <dependency>
                     <groupId>net.sourceforge.jtds</groupId>
                     <artifactId>jtds</artifactId>
@@ -2175,6 +2239,7 @@ org.hibernate.search.spi.SearchIntegratorBuilder#buildSearchIntegrator()
         <profile>
             <id>mssql2008R1</id>
             <dependencies>
+                <!-- These maven coordinates are fake (see above) -->
                 <dependency>
                     <groupId>jdbcdrivers</groupId>
                     <artifactId>mssql</artifactId>
@@ -2196,6 +2261,7 @@ org.hibernate.search.spi.SearchIntegratorBuilder#buildSearchIntegrator()
         <profile>
             <id>mssql2008R2</id>
             <dependencies>
+                <!-- These maven coordinates are fake (see above) -->
                 <dependency>
                     <groupId>jdbcdrivers</groupId>
                     <artifactId>mssql</artifactId>

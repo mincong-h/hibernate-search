@@ -47,7 +47,6 @@ import org.hibernate.search.engine.nulls.codec.impl.NullMarkerCodec;
 import org.hibernate.search.engine.spi.DocumentBuilderIndexedEntity;
 import org.hibernate.search.engine.spi.EntityIndexBinding;
 import org.hibernate.search.exception.AssertionFailure;
-import org.hibernate.search.exception.SearchException;
 import org.hibernate.search.spatial.impl.SpatialHelper;
 import org.hibernate.search.util.logging.impl.LoggerFactory;
 
@@ -72,7 +71,7 @@ public class Elasticsearch2SchemaTranslator implements ElasticsearchSchemaTransl
 
 		ElasticsearchIndexSettingsBuilder settingsBuilder = new ElasticsearchIndexSettingsBuilder();
 		for ( EntityIndexBinding descriptor : descriptors ) {
-			String typeName = descriptor.getDocumentBuilder().getBeanClass().getName();
+			String typeName = descriptor.getDocumentBuilder().getTypeIdentifier().getName();
 
 			TypeMapping mapping = translate( descriptor, settingsBuilder, executionOptions );
 
@@ -171,12 +170,7 @@ public class Elasticsearch2SchemaTranslator implements ElasticsearchSchemaTransl
 		addNullValue( propertyMapping, mappingBuilder, fieldMetadata );
 
 		for ( FacetMetadata facetMetadata : fieldMetadata.getFacetMetadata() ) {
-			try {
-				addSubfieldMapping( propertyMapping, mappingBuilder, facetMetadata );
-			}
-			catch (IncompleteDataException e) {
-				LOG.debug( "Not adding a mapping for facet " + facetMetadata.getAbsoluteName() + " because of incomplete data", e );
-			}
+			addSubfieldMapping( propertyMapping, mappingBuilder, facetMetadata );
 		}
 
 		// Do this last, when we're sure no exception will be thrown for this mapping
@@ -185,7 +179,7 @@ public class Elasticsearch2SchemaTranslator implements ElasticsearchSchemaTransl
 
 	private void logDynamicBoostWarning(ElasticsearchMappingBuilder mappingBuilder, BoostStrategy dynamicBoostStrategy, String fieldPath) {
 		if ( dynamicBoostStrategy != null && !DefaultBoostStrategy.INSTANCE.equals( dynamicBoostStrategy ) ) {
-			LOG.unsupportedDynamicBoost( dynamicBoostStrategy.getClass(), mappingBuilder.getBeanClass(), fieldPath );
+			LOG.unsupportedDynamicBoost( dynamicBoostStrategy.getClass(), mappingBuilder.getTypeIdentifier(), fieldPath );
 		}
 	}
 
@@ -281,7 +275,7 @@ public class Elasticsearch2SchemaTranslator implements ElasticsearchSchemaTransl
 
 		if ( IndexType.ANALYZED.equals( elasticsearchIndex ) && analyzerReference != null ) {
 			if ( !analyzerReference.is( ElasticsearchAnalyzerReference.class ) ) {
-				LOG.analyzerIsNotElasticsearch( mappingBuilder.getBeanClass(), propertyPath, analyzerReference );
+				LOG.analyzerIsNotElasticsearch( mappingBuilder.getTypeIdentifier(), propertyPath, analyzerReference );
 			}
 			else {
 				ElasticsearchAnalyzerReference elasticsearchReference = analyzerReference.unwrap( ElasticsearchAnalyzerReference.class );
@@ -451,7 +445,7 @@ public class Elasticsearch2SchemaTranslator implements ElasticsearchSchemaTransl
 				elasticsearchType = DataType.OBJECT;
 				break;
 			case UNKNOWN_NUMERIC:
-				throw LOG.unexpectedNumericEncodingType( mappingBuilder.getBeanClass().getName(), fieldName );
+				throw LOG.unexpectedNumericEncodingType( mappingBuilder.getTypeIdentifier(), fieldName );
 			case STRING:
 			case UNKNOWN:
 			default:
@@ -503,7 +497,7 @@ public class Elasticsearch2SchemaTranslator implements ElasticsearchSchemaTransl
 			return new JsonPrimitive( (Boolean) indexedNullToken );
 		}
 		else {
-			throw LOG.unsupportedNullTokenType( mappingBuilder.getBeanClass().getName(), fieldPath.getAbsoluteName(),
+			throw LOG.unsupportedNullTokenType( mappingBuilder.getTypeIdentifier(), fieldPath.getAbsoluteName(),
 					indexedNullToken.getClass() );
 		}
 	}
@@ -519,9 +513,4 @@ public class Elasticsearch2SchemaTranslator implements ElasticsearchSchemaTransl
 		return bridgeDefinedFields;
 	}
 
-	private static class IncompleteDataException extends SearchException {
-		public IncompleteDataException(String message) {
-			super( message );
-		}
-	}
 }

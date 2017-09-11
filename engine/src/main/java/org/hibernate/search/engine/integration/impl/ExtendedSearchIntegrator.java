@@ -19,7 +19,6 @@ import org.hibernate.search.indexes.impl.IndexManagerHolder;
 import org.hibernate.search.indexes.spi.IndexManagerType;
 import org.hibernate.search.query.DatabaseRetrievalMethod;
 import org.hibernate.search.query.ObjectLookupMethod;
-import org.hibernate.search.query.engine.spi.HSQuery;
 import org.hibernate.search.spi.IndexedTypeSet;
 import org.hibernate.search.spi.InstanceInitializer;
 import org.hibernate.search.spi.SearchIntegrator;
@@ -35,9 +34,6 @@ import org.hibernate.search.stat.spi.StatisticsImplementor;
  */
 public interface ExtendedSearchIntegrator extends SearchIntegrator {
 
-	@Deprecated
-	DocumentBuilderContainedEntity getDocumentBuilderContainedEntity(Class<?> entityType);
-
 	DocumentBuilderContainedEntity getDocumentBuilderContainedEntity(IndexedTypeIdentifier entityType);
 
 	FilterCachingStrategy getFilterCachingStrategy();
@@ -52,12 +48,9 @@ public interface ExtendedSearchIntegrator extends SearchIntegrator {
 	 * "Configured" types are types that Hibernate Search was instructed to take into consideration,
 	 * i.e. types returned by {@link SearchConfiguration#getClassMappings()}.
 	 *
-	 * @param classes an array of types
+	 * @param types
 	 * @return the set of configured subtypes
 	 */
-	@Deprecated
-	IndexedTypeSet getConfiguredTypesPolymorphic(Class<?>[] classes);
-
 	IndexedTypeSet getConfiguredTypesPolymorphic(IndexedTypeSet types);
 
 	/**
@@ -72,13 +65,10 @@ public interface ExtendedSearchIntegrator extends SearchIntegrator {
 	 * Note: the fact that a given type is configured or indexed doesn't mean that its subtypes are, too.
 	 * Each type must be configured explicitly.
 	 *
-	 * @param classes an array of types
+	 * @param types the target set
 	 * @return the set of configured subtypes that are indexed
 	 */
-	@Deprecated
-	IndexedTypeSet getIndexedTypesPolymorphic(Class<?>[] classes);
-
-	IndexedTypeSet getIndexedTypesPolymorphic(IndexedTypeSet queryTarget);
+	IndexedTypeSet getIndexedTypesPolymorphic(IndexedTypeSet types);
 
 	/**
 	 * @return {@code true} if JMX is enabled
@@ -174,19 +164,5 @@ public interface ExtendedSearchIntegrator extends SearchIntegrator {
 	 * type is not an indexed entity.
 	 */
 	ScopedAnalyzerReference getAnalyzerReference(IndexedTypeIdentifier type);
-
-	/**
-	 * @deprecated use {@link #getAnalyzerReference(IndexedTypeIdentifier)}
-	 */
-	@Deprecated
-	ScopedAnalyzerReference getAnalyzerReference(Class<?> clazz);
-
-	/**
-	 * Return an Hibernate Search query object.
-	 * This method does NOT support non-Lucene backends (e.g. Elasticsearch).
-	 *
-	 * @return an Hibernate Search query object
-	 */
-	HSQuery createLuceneBasedHSQuery();
 
 }

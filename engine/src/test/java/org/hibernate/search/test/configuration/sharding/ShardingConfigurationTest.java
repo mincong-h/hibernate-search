@@ -29,14 +29,17 @@ import org.hibernate.search.engine.impl.MutableSearchFactory;
 import org.hibernate.search.engine.spi.EntityIndexBinding;
 import org.hibernate.search.exception.SearchException;
 import org.hibernate.search.filter.FullTextFilterImplementor;
+import org.hibernate.search.indexes.impl.IndexShardingStrategyIndexManagerSelector;
+import org.hibernate.search.indexes.impl.NotShardedIndexManagerSelector;
 import org.hibernate.search.indexes.spi.DirectoryBasedIndexManager;
 import org.hibernate.search.indexes.spi.IndexManager;
+import org.hibernate.search.indexes.spi.IndexManagerSelector;
 import org.hibernate.search.spi.BuildContext;
+import org.hibernate.search.spi.impl.PojoIndexedTypeIdentifier;
 import org.hibernate.search.store.IndexShardingStrategy;
 import org.hibernate.search.store.ShardIdentifierProvider;
 import org.hibernate.search.store.impl.FSDirectoryProvider;
 import org.hibernate.search.store.impl.IdHashShardingStrategy;
-import org.hibernate.search.store.impl.NotShardedStrategy;
 import org.hibernate.search.test.util.impl.ExpectedLog4jLog;
 import org.hibernate.search.testsupport.TestConstants;
 import org.hibernate.search.testsupport.TestForIssue;
@@ -65,12 +68,19 @@ public class ShardingConfigurationTest {
 	public void testNoShardingIsUsedPerDefault() {
 		MutableSearchFactory searchFactory = getSearchFactory( Collections.<String, String>emptyMap() );
 
-		EntityIndexBinding entityIndexBinding = searchFactory.getIndexBinding( Foo.class );
+		EntityIndexBinding entityIndexBinding = searchFactory.getIndexBindings().get( Foo.class );
+
+		IndexManagerSelector selector = entityIndexBinding.getIndexManagerSelector();
 
 		assertEquals(
 				"No sharding should be configured. Number of shards and sharding strategy are not set",
-				NotShardedStrategy.class,
-				entityIndexBinding.getSelectionStrategy().getClass()
+				NotShardedIndexManagerSelector.class,
+				selector.getClass()
+		);
+		assertEquals(
+				"There should be exactly one shard",
+				1,
+				selector.all().size()
 		);
 	}
 
@@ -81,12 +91,19 @@ public class ShardingConfigurationTest {
 
 		MutableSearchFactory searchFactory = getSearchFactory( shardingProperties );
 
-		EntityIndexBinding entityIndexBinding = searchFactory.getIndexBinding( Foo.class );
+		EntityIndexBinding entityIndexBinding = searchFactory.getIndexBindings().get( Foo.class );
+
+		IndexManagerSelector selector = entityIndexBinding.getIndexManagerSelector();
 
 		assertEquals(
-				"IdHashShardingStrategy should be selected due to number of shards being set",
-				IdHashShardingStrategy.class,
-				entityIndexBinding.getSelectionStrategy().getClass()
+				"IndexShardingStrategyIndexManagerSelector should be used due to number of shards being set",
+				IndexShardingStrategyIndexManagerSelector.class,
+				selector.getClass()
+		);
+		assertEquals(
+				"There should be exactly two shards",
+				2,
+				selector.all().size()
 		);
 	}
 
@@ -139,12 +156,12 @@ public class ShardingConfigurationTest {
 
 		logged.expectMessage( "HSEARCH000193", "IdHashShardingStrategy" );
 
-		EntityIndexBinding entityIndexBinding = getSearchFactory( shardingProperties ).getIndexBinding( Foo.class );
+		EntityIndexBinding entityIndexBinding = getSearchFactory( shardingProperties ).getIndexBindings().get( Foo.class );
 
 		// 1 is assumed for legacy reasons. IMO not setting the number of shards should throw an exception
 		assertTrue(
 				"Without specifying number of shards, 1 should be assumed",
-				entityIndexBinding.getSelectionStrategy().getIndexManagersForAllShards().length == 1
+				entityIndexBinding.getIndexManagerSelector().all().size() == 1
 		);
 	}
 
@@ -159,17 +176,26 @@ public class ShardingConfigurationTest {
 
 		MutableSearchFactory searchFactory = getSearchFactory( shardingProperties );
 
-		EntityIndexBinding entityIndexBinding = searchFactory.getIndexBinding( Foo.class );
+		EntityIndexBinding entityIndexBinding = searchFactory.getIndexBindings().get( Foo.class );
+
+		IndexManagerSelector selector = entityIndexBinding.getIndexManagerSelector();
 
 		assertEquals(
 				"Explicitly set sharding strategy ignored",
-				DummyIndexShardingStrategy.class,
-				entityIndexBinding.getSelectionStrategy().getClass()
+				IndexShardingStrategyIndexManagerSelector.class,
+				selector.getClass()
 		);
 
-		assertTrue(
+		assertEquals(
 				"Number of shards is explicitly set, but ignored",
-				entityIndexBinding.getSelectionStrategy().getIndexManagersForAllShards().length == 2
+				2,
+				entityIndexBinding.getIndexManagerSelector().all().size()
+		);
+
+		assertEquals(
+				"Explicitly set sharding strategy ignored",
+				0,
+				entityIndexBinding.getIndexManagerSelector().forExisting( new PojoIndexedTypeIdentifier( Foo.class ), null, null ).size()
 		);
 	}
 
@@ -183,7 +209,7 @@ public class ShardingConfigurationTest {
 
 		MutableSearchFactory searchFactory = getSearchFactory( shardingProperties );
 
-		EntityIndexBinding entityIndexBinding = searchFactory.getIndexBinding( Foo.class );
+		EntityIndexBinding entityIndexBinding = searchFactory.getIndexBindings().get( Foo.class );
 
 		assertEquals(
 				"Explicitly set shard id provider ignored",
@@ -216,7 +242,7 @@ public class ShardingConfigurationTest {
 
 		MutableSearchFactory searchFactory = getSearchFactory( shardingProperties );
 
-		EntityIndexBinding entityIndexBinding = searchFactory.getIndexBinding( Foo.class );
+		EntityIndexBinding entityIndexBinding = searchFactory.getIndexBindings().get( Foo.class );
 
 		assertEquals(
 				"Explicitly set shard id provider ignored",
@@ -240,13 +266,13 @@ public class ShardingConfigurationTest {
 
 		MutableSearchFactory searchFactory = getSearchFactory( shardingProperties );
 
-		EntityIndexBinding entityIndexBinding = searchFactory.getIndexBinding( Foo.class );
-		IndexManager indexManagers[] = entityIndexBinding.getIndexManagers();
+		EntityIndexBinding entityIndexBinding = searchFactory.getIndexBindings().get( Foo.class );
+		Set<IndexManager> indexManagers = entityIndexBinding.getIndexManagerSelector().all();
 
-		assertTrue( "There should be two index managers", indexManagers.length == 1 );
-		assertTrue( "Unexpected index manager type", indexManagers[0] instanceof DirectoryBasedIndexManager );
+		assertTrue( "There should be two index managers", indexManagers.size() == 1 );
+		assertTrue( "Unexpected index manager type", indexManagers.iterator().next() instanceof DirectoryBasedIndexManager );
 
-		DirectoryBasedIndexManager directoryBasedIndexManager = (DirectoryBasedIndexManager) indexManagers[0];
+		DirectoryBasedIndexManager directoryBasedIndexManager = (DirectoryBasedIndexManager) indexManagers.iterator().next();
 		assertTrue(
 				"Unexpected directory provider type: " + directoryBasedIndexManager.getDirectoryProvider().getClass(),
 				directoryBasedIndexManager.getDirectoryProvider() instanceof FSDirectoryProvider

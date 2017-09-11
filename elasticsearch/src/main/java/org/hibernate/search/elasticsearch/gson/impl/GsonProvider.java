@@ -6,6 +6,8 @@
  */
 package org.hibernate.search.elasticsearch.gson.impl;
 
+import org.hibernate.search.elasticsearch.util.impl.JsonLogHelper;
+
 import com.google.gson.Gson;
 
 /**
@@ -18,13 +20,10 @@ public interface GsonProvider {
 	Gson getGson();
 
 	/**
-	 * @return Same as {@link #getGson()}, but with pretty-printing turned on. Useful for logging.
-	 */
-	Gson getGsonPrettyPrinting();
-
-	/**
 	 * @return Same as {@link #getGson()}, but with null serialization turned off.
 	 */
 	Gson getGsonNoSerializeNulls();
+
+	JsonLogHelper getLogHelper();
 
 }

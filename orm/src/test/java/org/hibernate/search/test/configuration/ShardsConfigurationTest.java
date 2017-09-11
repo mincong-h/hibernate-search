@@ -7,12 +7,15 @@
 package org.hibernate.search.test.configuration;
 
 import java.util.Map;
+import java.util.Set;
 
 import org.hibernate.search.engine.spi.EntityIndexBinding;
+import org.hibernate.search.indexes.impl.IndexShardingStrategyIndexManagerSelector;
 import org.hibernate.search.indexes.spi.DirectoryBasedIndexManager;
 import org.hibernate.search.indexes.spi.IndexManager;
+import org.hibernate.search.indexes.spi.IndexManagerSelector;
+import org.hibernate.search.spi.impl.PojoIndexedTypeIdentifier;
 import org.hibernate.search.store.DirectoryProvider;
-import org.hibernate.search.store.IndexShardingStrategy;
 import org.hibernate.search.store.impl.FSDirectoryProvider;
 import org.hibernate.search.store.impl.RAMDirectoryProvider;
 import org.hibernate.search.test.Document;
@@ -63,30 +66,36 @@ public class ShardsConfigurationTest extends ConfigurationReadTestCase {
 
 	@Test
 	public void testCorrectNumberOfShardsDetected() {
-		EntityIndexBinding indexBindingForDocument = getExtendedSearchIntegrator().getIndexBinding( Document.class );
-		IndexManager[] documentManagers = indexBindingForDocument.getIndexManagers();
+		EntityIndexBinding indexBindingForDocument = getExtendedSearchIntegrator().getIndexBindings().get( Document.class );
+		Set<IndexManager> documentManagers = indexBindingForDocument.getIndexManagerSelector().all();
 		assertNotNull( documentManagers );
-		assertEquals( 4, documentManagers.length );
-		EntityIndexBinding indexBindingForBooks = getExtendedSearchIntegrator().getIndexBinding( Book.class );
-		IndexManager[] bookManagers = indexBindingForBooks.getIndexManagers();
+		assertEquals( 4, documentManagers.size() );
+		EntityIndexBinding indexBindingForBooks = getExtendedSearchIntegrator().getIndexBindings().get( Book.class );
+		Set<IndexManager> bookManagers = indexBindingForBooks.getIndexManagerSelector().all();
 		assertNotNull( bookManagers );
-		assertEquals( 2, bookManagers.length );
+		assertEquals( 2, bookManagers.size() );
 	}
 
 	@Test
 	public void testSelectionOfShardingStrategy() {
-		IndexShardingStrategy shardingStrategy = getExtendedSearchIntegrator().getIndexBinding( Document.class ).getSelectionStrategy();
-		assertNotNull( shardingStrategy );
-		assertEquals( shardingStrategy.getClass(), UselessShardingStrategy.class );
+		IndexManagerSelector selector = getExtendedSearchIntegrator().getIndexBindings().get( Document.class ).getIndexManagerSelector();
+		assertNotNull( selector );
+		assertEquals( selector.getClass(), IndexShardingStrategyIndexManagerSelector.class );
+		assertEquals( 4, selector.all().size() );
+		assertEquals(
+				"Expected the useless strategy to be used (never returns any shard)",
+				0,
+				selector.forExisting( new PojoIndexedTypeIdentifier( Document.class ), null, null ).size()
+		);
 	}
 
 	@Test
 	@Category(SkipOnElasticsearch.class) // DirectoryProviders and IndexWriterSettings are specific to the Lucene backend
 	public void testShardingSettingsInherited() {
-		IndexManager[] indexManagers = getExtendedSearchIntegrator().getIndexBindings().get( Document.class ).getIndexManagers();
-		assertTrue( getDirectoryProvider( indexManagers[0] ) instanceof RAMDirectoryProvider );
-		assertTrue( getDirectoryProvider( indexManagers[1] ) instanceof FSDirectoryProvider );
-		assertTrue( getDirectoryProvider( indexManagers[2] ) instanceof RAMDirectoryProvider );
+		EntityIndexBinding binding = getExtendedSearchIntegrator().getIndexBindings().get( Document.class );
+		assertTrue( getDirectoryProvider( getIndexManager( binding, 0 ) ) instanceof RAMDirectoryProvider );
+		assertTrue( getDirectoryProvider( getIndexManager( binding, 1 ) ) instanceof FSDirectoryProvider );
+		assertTrue( getDirectoryProvider( getIndexManager( binding, 2 ) ) instanceof RAMDirectoryProvider );
 		assertValueIsSet( Document.class, 0, MAX_BUFFERED_DOCS, 58 );
 		assertValueIsSet( Document.class, 1, MAX_BUFFERED_DOCS, 12 );
 	}

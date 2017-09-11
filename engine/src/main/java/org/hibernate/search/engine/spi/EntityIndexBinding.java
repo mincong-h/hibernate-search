@@ -8,10 +8,9 @@ package org.hibernate.search.engine.spi;
 
 import org.apache.lucene.search.similarities.Similarity;
 import org.hibernate.search.indexes.interceptor.EntityIndexingInterceptor;
-import org.hibernate.search.indexes.spi.IndexManager;
+import org.hibernate.search.indexes.spi.IndexManagerSelector;
 import org.hibernate.search.indexes.spi.IndexManagerType;
 import org.hibernate.search.spi.IndexedTypeSet;
-import org.hibernate.search.store.IndexShardingStrategy;
 import org.hibernate.search.store.ShardIdentifierProvider;
 
 /**
@@ -28,9 +27,9 @@ public interface EntityIndexBinding {
 	Similarity getSimilarity();
 
 	/**
-	 * @return the sharding strategy
+	 * @return the index manager selector
 	 */
-	IndexShardingStrategy getSelectionStrategy();
+	IndexManagerSelector getIndexManagerSelector();
 
 	/**
 	 * @return the shard identifier provider. Can be {@code null} depending on selected {@code IndexShardingStrategy}.
@@ -53,11 +52,6 @@ public interface EntityIndexBinding {
 	 * @return the type of index managers
 	 */
 	IndexManagerType getIndexManagerType();
-
-	/**
-	 * @return the array of index managers
-	 */
-	IndexManager[] getIndexManagers();
 
 	/**
 	 * @return the interceptor for indexing operations. Can be {@code null}

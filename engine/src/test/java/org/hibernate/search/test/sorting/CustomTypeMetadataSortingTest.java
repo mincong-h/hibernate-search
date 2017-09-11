@@ -23,20 +23,19 @@ import org.hibernate.search.annotations.Field;
 import org.hibernate.search.annotations.FieldBridge;
 import org.hibernate.search.annotations.Indexed;
 import org.hibernate.search.annotations.SortableField;
-import org.hibernate.search.backend.spi.Work;
-import org.hibernate.search.backend.spi.WorkType;
-import org.hibernate.search.backend.spi.Worker;
 import org.hibernate.search.bridge.LuceneOptions;
 import org.hibernate.search.cfg.Environment;
 import org.hibernate.search.query.engine.spi.HSQuery;
 import org.hibernate.search.spi.CustomTypeMetadata;
 import org.hibernate.search.spi.IndexedTypeIdentifier;
+import org.hibernate.search.spi.IndexedTypeMap;
+import org.hibernate.search.spi.impl.IndexedTypeMaps;
 import org.hibernate.search.spi.impl.PojoIndexedTypeIdentifier;
 import org.hibernate.search.test.util.impl.ExpectedLog4jLog;
 import org.hibernate.search.testsupport.TestForIssue;
 import org.hibernate.search.testsupport.junit.SearchFactoryHolder;
+import org.hibernate.search.testsupport.junit.SearchITHelper;
 import org.hibernate.search.testsupport.junit.SkipOnElasticsearch;
-import org.hibernate.search.testsupport.setup.TransactionContextForTest;
 import org.hibernate.search.util.impl.CollectionHelper;
 import org.junit.Rule;
 import org.junit.Test;
@@ -47,6 +46,9 @@ import org.junit.experimental.categories.Category;
 public class CustomTypeMetadataSortingTest {
 
 	private static final String UNINVERTING_READER_LOG_CODE = "HSEARCH000289";
+
+	private static final IndexedTypeIdentifier PROPERTY_SET_TYPE_ID = new PojoIndexedTypeIdentifier( PropertySet.class );
+	private static final IndexedTypeIdentifier PERSON_TYPE_ID = new PojoIndexedTypeIdentifier( Person.class );
 
 	private static final Sort FIRST_NAME_SORT = new Sort( new SortField( "properties.firstName", SortField.Type.STRING ) );
 	private static final Sort FIRST_NAME_SORT_REVERSED =
@@ -59,9 +61,11 @@ public class CustomTypeMetadataSortingTest {
 	public final SearchFactoryHolder factoryHolder = new SearchFactoryHolder( PropertySet.class, ExtendedPropertySet.class, Person.class )
 			.withProperty( Environment.INDEX_UNINVERTING_ALLOWED, "true" );
 
+	private final SearchITHelper helper = new SearchITHelper( factoryHolder );
+
 	@Test
 	public void undeclaredSortableField_defaultMetadata() {
-		storeTestingData(
+		helper.index(
 				new PropertySet( 0 )
 						.put( "firstName", "Aaron" )
 						.put( "lastName", "Zahnd" )
@@ -90,7 +94,7 @@ public class CustomTypeMetadataSortingTest {
 
 	@Test
 	public void undeclaredSortableField_incorrectCustomMetadata() {
-		storeTestingData(
+		helper.index(
 				new PropertySet( 0 )
 						.put( "firstName", "Aaron" )
 						.put( "lastName", "Zahnd" )
@@ -106,13 +110,16 @@ public class CustomTypeMetadataSortingTest {
 
 		Query luceneQuery = factoryHolder.getSearchFactory().buildQueryBuilder().forEntity( PropertySet.class ).get().all().createQuery();
 
-		CustomTypeMetadata incorrectCustomMetadata = new PropertySetMetadata() {
+		CustomTypeMetadata incorrectCustomMetadata = new CustomTypeMetadata() {
 			@Override
 			public Set<String> getSortableFields() {
 				return Collections.singleton( "properties.nonSortableField" );
 			}
 		};
-		HSQuery query = factoryHolder.getSearchFactory().createHSQuery( luceneQuery, incorrectCustomMetadata, new PersonMetadata() )
+		IndexedTypeMap<CustomTypeMetadata> metadata = IndexedTypeMaps.hashMap();
+		metadata.put( PROPERTY_SET_TYPE_ID, incorrectCustomMetadata );
+		metadata.put( PERSON_TYPE_ID, new EmptyMetadata() );
+		HSQuery query = factoryHolder.getSearchFactory().createHSQuery( luceneQuery, metadata )
 				.sort( FIRST_NAME_SORT );
 
 		Assertions.assertThat( query.queryEntityInfos() ).onProperty( "id" ).as( "Sorted IDs" )
@@ -125,7 +132,7 @@ public class CustomTypeMetadataSortingTest {
 
 	@Test
 	public void undeclaredSortableField_correctCustomMetadata() {
-		storeTestingData(
+		helper.index(
 				new PropertySet( 0 )
 						.put( "firstName", "Aaron" )
 						.put( "lastName", "Zahnd" )
@@ -142,7 +149,10 @@ public class CustomTypeMetadataSortingTest {
 
 		Query luceneQuery = factoryHolder.getSearchFactory().buildQueryBuilder().forEntity( PropertySet.class ).get().all().createQuery();
 
-		HSQuery query = factoryHolder.getSearchFactory().createHSQuery( luceneQuery, new PropertySetMetadata(), new PersonMetadata() )
+		IndexedTypeMap<CustomTypeMetadata> metadata = IndexedTypeMaps.hashMap();
+		metadata.put( PROPERTY_SET_TYPE_ID, new PropertySetMetadata() );
+		metadata.put( PERSON_TYPE_ID, new EmptyMetadata() );
+		HSQuery query = factoryHolder.getSearchFactory().createHSQuery( luceneQuery, metadata )
 				.sort( FIRST_NAME_SORT );
 
 		Assertions.assertThat( query.queryEntityInfos() ).onProperty( "id" ).as( "Sorted IDs" )
@@ -153,22 +163,8 @@ public class CustomTypeMetadataSortingTest {
 				.containsExactly( 2, 1, 0 );
 	}
 
-	private void storeTestingData(Identifiable... testData) {
-		Worker worker = factoryHolder.getSearchFactory().getWorker();
-		TransactionContextForTest tc = new TransactionContextForTest();
-		for ( int i = 0; i < testData.length; i++ ) {
-			Identifiable identifiable = testData[i];
-			worker.performWork( new Work( identifiable, identifiable.getId(), WorkType.INDEX ), tc );
-		}
-		tc.end();
-	}
-
-	private interface Identifiable {
-		int getId();
-	}
-
 	@Indexed(index = "propertySet")
-	private static class PropertySet implements Identifiable {
+	private static class PropertySet {
 
 		@DocumentId
 		int id;
@@ -178,11 +174,6 @@ public class CustomTypeMetadataSortingTest {
 
 		public PropertySet(int id) {
 			this.id = id;
-		}
-
-		@Override
-		public int getId() {
-			return id;
 		}
 
 		public PropertySet put(String name, String value) {
@@ -199,7 +190,7 @@ public class CustomTypeMetadataSortingTest {
 	}
 
 	@Indexed(index = "person")
-	private static class Person implements Identifiable {
+	private static class Person {
 		@DocumentId
 		int id;
 
@@ -210,11 +201,6 @@ public class CustomTypeMetadataSortingTest {
 		public Person(int id, String firstName) {
 			this.id = id;
 			this.firstName = firstName;
-		}
-
-		@Override
-		public int getId() {
-			return id;
 		}
 	}
 
@@ -253,22 +239,12 @@ public class CustomTypeMetadataSortingTest {
 		}
 
 		@Override
-		public IndexedTypeIdentifier getEntityType() {
-			return new PojoIndexedTypeIdentifier( PropertySet.class );
-		}
-
-		@Override
 		public Set<String> getSortableFields() {
 			return sortableFields;
 		}
 
 	}
-	private static class PersonMetadata implements CustomTypeMetadata {
-
-		@Override
-		public IndexedTypeIdentifier getEntityType() {
-			return new PojoIndexedTypeIdentifier( Person.class );
-		}
+	private static class EmptyMetadata implements CustomTypeMetadata {
 
 		@Override
 		public Set<String> getSortableFields() {

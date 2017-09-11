@@ -31,6 +31,8 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
+import java.util.Set;
+
 /**
  * @author Hardy Ferentschik
  */
@@ -71,11 +73,11 @@ public class FSDirectorySelectionTest extends SearchTestBase {
 
 		FullTextSession fullTextSession = Search.getFullTextSession( session );
 		SearchIntegrator integrator = fullTextSession.getSearchFactory().unwrap( SearchIntegrator.class );
-		EntityIndexBinding snowIndexBinder = integrator.getIndexBinding( SnowStorm.class );
-		IndexManager[] indexManagers = snowIndexBinder.getIndexManagers();
-		assertTrue( "Wrong number of directory providers", indexManagers.length == 1 );
+		EntityIndexBinding snowIndexBinder = integrator.getIndexBindings().get( SnowStorm.class );
+		Set<IndexManager> indexManagers = snowIndexBinder.getIndexManagerSelector().all();
+		assertTrue( "Wrong number of directory providers", indexManagers.size() == 1 );
 
-		DirectoryBasedIndexManager indexManager = (DirectoryBasedIndexManager) indexManagers[0];
+		DirectoryBasedIndexManager indexManager = (DirectoryBasedIndexManager) indexManagers.iterator().next();
 		Directory directory = indexManager.getDirectoryProvider().getDirectory();
 		assertEquals( "Wrong directory provider type", className, directory.getClass().getName() );
 		session.close();

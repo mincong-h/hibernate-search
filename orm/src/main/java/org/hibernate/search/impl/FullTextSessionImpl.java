@@ -79,12 +79,11 @@ final class FullTextSessionImpl extends SessionDelegatorBaseImpl implements Full
 
 	@Override
 	public FullTextQuery createFullTextQuery(QueryDescriptor queryDescriptor, Class<?>... entities) {
-		HSQuery hsQuery = queryDescriptor.createHSQuery( getSearchIntegrator() )
-				.targetedEntities( IndexedTypeSets.fromClasses( entities ) );
+		HSQuery hsQuery = queryDescriptor.createHSQuery( getSearchIntegrator(), IndexedTypeSets.fromClasses( entities ) );
 		return createFullTextQuery( hsQuery );
 	}
 
-	private FullTextQuery createFullTextQuery(HSQuery hsQuery, Class<?>... entities) {
+	private FullTextQuery createFullTextQuery(HSQuery hsQuery) {
 		return new FullTextQueryImpl(
 				hsQuery,
 				delegate,
@@ -149,7 +148,7 @@ final class FullTextSessionImpl extends SessionDelegatorBaseImpl implements Full
 		//TODO cache that at the FTSession level
 		ExtendedSearchIntegrator extendedIntegrator = getSearchIntegrator();
 		//not strictly necessary but a small optimization
-		if ( extendedIntegrator.getIndexBinding( clazz ) == null ) {
+		if ( extendedIntegrator.getIndexBindings().get( clazz ) == null ) {
 			String msg = "Entity to index is not an @Indexed entity: " + entity.getClass().getName();
 			throw new IllegalArgumentException( msg );
 		}

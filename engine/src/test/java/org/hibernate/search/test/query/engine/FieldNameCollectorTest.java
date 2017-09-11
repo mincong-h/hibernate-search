@@ -99,8 +99,9 @@ public class FieldNameCollectorTest {
 
 	@Test
 	public void testExtractFieldNameFromPhraseQuery() {
-		PhraseQuery phraseQuery = new PhraseQuery();
-		phraseQuery.add( new Term( "stringField", "hello world" ) );
+		PhraseQuery.Builder phraseQBuilder = new PhraseQuery.Builder();
+		phraseQBuilder.add( new Term( "stringField", "hello world" ) );
+		PhraseQuery phraseQuery = phraseQBuilder.build();
 		assertFieldNames( phraseQuery, FieldType.STRING, "stringField" );
 	}
 
@@ -153,13 +154,15 @@ public class FieldNameCollectorTest {
 
 	@Test
 	public void testDisjunctionMaxQuery() {
-		DisjunctionMaxQuery disjunctionMaxQuery = new DisjunctionMaxQuery( 0.0f );
+		Set<Query> queriesToCombine = new HashSet<>();
 
 		TermQuery termQuery = new TermQuery( new Term( "stringField", "foobar" ) );
-		disjunctionMaxQuery.add( termQuery );
+		queriesToCombine.add( termQuery );
 
 		NumericRangeQuery numericRangeQuery = NumericRangeQuery.newIntRange( "intField", 0, 0, true, true );
-		disjunctionMaxQuery.add( numericRangeQuery );
+		queriesToCombine.add( numericRangeQuery );
+
+		DisjunctionMaxQuery disjunctionMaxQuery = new DisjunctionMaxQuery( queriesToCombine, 0.0f );
 
 		assertFieldNames( disjunctionMaxQuery, FieldType.NUMBER, "intField" );
 		assertFieldNames( disjunctionMaxQuery, FieldType.STRING, "stringField" );

@@ -6,16 +6,12 @@
  */
 package org.hibernate.search.jsr352.massindexing.impl.util;
 
-import static org.hibernate.search.jsr352.massindexing.MassIndexingJobParameters.CUSTOM_QUERY_CRITERIA;
-
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-import java.util.stream.Collectors;
-
 import javax.batch.runtime.context.JobContext;
 import javax.persistence.EntityManagerFactory;
 
@@ -28,8 +24,12 @@ import org.hibernate.search.jsr352.context.jpa.EntityManagerFactoryRegistry;
 import org.hibernate.search.jsr352.context.jpa.impl.ActiveSessionFactoryRegistry;
 import org.hibernate.search.jsr352.logging.impl.Log;
 import org.hibernate.search.jsr352.massindexing.impl.JobContextData;
+import org.hibernate.search.spi.IndexedTypeIdentifier;
+import org.hibernate.search.spi.IndexedTypeSet;
 import org.hibernate.search.util.StringHelper;
 import org.hibernate.search.util.logging.impl.LoggerFactory;
+
+import static org.hibernate.search.jsr352.massindexing.MassIndexingJobParameters.CUSTOM_QUERY_CRITERIA;
 
 /**
  * Utility allowing to set up and retrieve the job context data, shared by all the steps.
@@ -98,11 +98,14 @@ public final class JobContextUtil {
 			throws ClassNotFoundException, IOException {
 		ExtendedSearchIntegrator searchIntegrator = ContextHelper.getSearchIntegratorBySF( emf.unwrap( SessionFactory.class ) );
 		List<String> entityNamesToIndex = Arrays.asList( entityTypes.split( "," ) );
-		Set<Class<?>> entityTypesToIndex = searchIntegrator
-				.getIndexedTypes()
-				.stream()
-				.filter( clz -> entityNamesToIndex.contains( clz.getName() ) )
-				.collect( Collectors.toCollection( HashSet::new ) );
+		IndexedTypeSet typeIds = searchIntegrator
+				.getIndexedTypeIdentifiers();
+		Set<Class<?>> entityTypesToIndex = new HashSet<>();
+		for ( IndexedTypeIdentifier typeId : typeIds ) {
+			if ( entityNamesToIndex.contains( typeId.getName() ) ) {
+				entityTypesToIndex.add( typeId.getPojoType() );
+			}
+		}
 
 		List<EntityTypeDescriptor> descriptors = PersistenceUtil.createDescriptors( emf, entityTypesToIndex );
 

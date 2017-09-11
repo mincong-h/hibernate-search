@@ -8,7 +8,6 @@ package org.hibernate.search.jsr352.massindexing.impl.util;
 
 import java.util.HashSet;
 import java.util.Set;
-import java.util.stream.Collectors;
 import javax.persistence.EntityManagerFactory;
 
 import org.hibernate.SessionFactory;
@@ -16,6 +15,8 @@ import org.hibernate.search.engine.integration.impl.ExtendedSearchIntegrator;
 import org.hibernate.search.hcore.util.impl.ContextHelper;
 import org.hibernate.search.jsr352.context.jpa.EntityManagerFactoryRegistry;
 import org.hibernate.search.jsr352.logging.impl.Log;
+import org.hibernate.search.spi.IndexedTypeIdentifier;
+import org.hibernate.search.spi.IndexedTypeSet;
 import org.hibernate.search.util.logging.impl.LoggerFactory;
 
 /**
@@ -56,11 +57,12 @@ public final class ValidationUtil {
 
 		ExtendedSearchIntegrator searchIntegrator = ContextHelper.getSearchIntegratorBySF( emf.unwrap( SessionFactory.class ) );
 		Set<String> failingTypes = new HashSet<>();
-		Set<String> indexedTypes = searchIntegrator
-				.getIndexedTypes()
-				.stream()
-				.map( Class::getName )
-				.collect( Collectors.toSet() );
+		IndexedTypeSet typeIds = searchIntegrator
+				.getIndexedTypeIdentifiers();
+		Set<String> indexedTypes = new HashSet<>();
+		for ( IndexedTypeIdentifier typeId : typeIds ) {
+			indexedTypes.add( typeId.getName() );
+		}
 
 		for ( String type : serializedEntityTypes.split( "," ) ) {
 			if ( !indexedTypes.contains( type ) ) {

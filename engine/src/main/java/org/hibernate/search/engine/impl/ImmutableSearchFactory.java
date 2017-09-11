@@ -6,12 +6,9 @@
  */
 package org.hibernate.search.engine.impl;
 
-import java.util.Arrays;
-import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Properties;
-import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Predicate;
 
@@ -58,7 +55,6 @@ import org.hibernate.search.query.DatabaseRetrievalMethod;
 import org.hibernate.search.query.ObjectLookupMethod;
 import org.hibernate.search.query.dsl.QueryContextBuilder;
 import org.hibernate.search.query.dsl.impl.ConnectedQueryContextBuilder;
-import org.hibernate.search.query.engine.impl.LuceneHSQuery;
 import org.hibernate.search.query.engine.impl.LuceneQueryTranslator;
 import org.hibernate.search.query.engine.spi.HSQuery;
 import org.hibernate.search.query.engine.spi.QueryDescriptor;
@@ -71,16 +67,16 @@ import org.hibernate.search.spi.InstanceInitializer;
 import org.hibernate.search.spi.SearchIntegrator;
 import org.hibernate.search.spi.IndexedTypeMap;
 import org.hibernate.search.spi.WorkerBuildContext;
-import org.hibernate.search.spi.impl.ConcurrentIndexedTypeMap;
 import org.hibernate.search.spi.impl.ExtendedSearchIntegratorWithShareableState;
+import org.hibernate.search.spi.impl.IndexedTypeMaps;
 import org.hibernate.search.spi.impl.IndexedTypeSets;
-import org.hibernate.search.spi.impl.PojoIndexedTypeIdentifier;
 import org.hibernate.search.spi.impl.TypeHierarchy;
 import org.hibernate.search.spi.impl.SearchFactoryState;
 import org.hibernate.search.stat.Statistics;
 import org.hibernate.search.stat.impl.StatisticsImpl;
 import org.hibernate.search.stat.spi.StatisticsImplementor;
 import org.hibernate.search.util.configuration.impl.ConfigurationParseHelper;
+import org.hibernate.search.util.impl.Closer;
 import org.hibernate.search.util.logging.impl.Log;
 import org.hibernate.search.util.logging.impl.LoggerFactory;
 
@@ -190,7 +186,7 @@ public class ImmutableSearchFactory implements ExtendedSearchIntegratorWithShare
 		}
 
 		this.indexReaderAccessor = new DefaultIndexReaderAccessor( this );
-		this.indexedTypeDescriptors = new ConcurrentIndexedTypeMap<>();
+		this.indexedTypeDescriptors = IndexedTypeMaps.concurrentHashMap();
 
 		this.defaultObjectLookupMethod = determineDefaultObjectLookupMethod();
 		this.defaultDatabaseRetrievalMethod = determineDefaultDatabaseRetrievalMethod();
@@ -250,12 +246,6 @@ public class ImmutableSearchFactory implements ExtendedSearchIntegratorWithShare
 	}
 
 	@Override
-	@Deprecated
-	public String getIndexingStrategy() {
-		return indexingMode.toExternalRepresentation();
-	}
-
-	@Override
 	public IndexingMode getIndexingMode() {
 		return indexingMode;
 	}
@@ -263,29 +253,30 @@ public class ImmutableSearchFactory implements ExtendedSearchIntegratorWithShare
 	@Override
 	public void close() {
 		if ( stopped.compareAndSet( false, true ) ) { //make sure we only stop once
-			try {
-				worker.close();
-			}
-			catch (Exception e) {
-				log.workerException( e );
-			}
+			try ( Closer<RuntimeException> closer = new Closer<>() ) {
+				closer.push( () -> {
+					try {
+						worker.close();
+					}
+					catch (Exception e) {
+						log.workerException( e );
+					}
+				} );
 
-			if ( workSerializer != null ) {
-				serviceManager.releaseService( LuceneWorkSerializer.class );
-			}
+				closer.push( allIndexesManager::stop );
+				closer.push( timingSource::stop );
 
-			this.allIndexesManager.stop();
-			this.timingSource.stop();
+				if ( workSerializer != null ) {
+					closer.push( serviceManager::releaseService, LuceneWorkSerializer.class );
+				}
 
-			serviceManager.releaseAllServices();
+				closer.push( serviceManager::releaseAllServices );
+				closer.pushAll( SearchIntegration::close, this.integrations.values() );
 
-			for ( SearchIntegration integration : this.integrations.values() ) {
-				integration.close();
-			}
-
-			// unregister statistic mbean
-			if ( statisticsMBeanName != null ) {
-				JMXRegistrar.unRegisterMBean( statisticsMBeanName );
+				// unregister statistic mbean
+				if ( statisticsMBeanName != null ) {
+					closer.push( JMXRegistrar::unRegisterMBean, statisticsMBeanName );
+				}
 			}
 		}
 	}
@@ -294,17 +285,14 @@ public class ImmutableSearchFactory implements ExtendedSearchIntegratorWithShare
 	public HSQuery createHSQuery(Query luceneQuery, Class<?>... entityTypes) {
 		IndexedTypeSet newtypes = IndexedTypeSets.fromClasses( entityTypes );
 		QueryDescriptor descriptor = createQueryDescriptor( luceneQuery, newtypes );
-		return descriptor.createHSQuery( this ).targetedEntities( newtypes );
+		return descriptor.createHSQuery( this, newtypes );
 	}
 
 	@Override
-	public HSQuery createHSQuery(Query luceneQuery, CustomTypeMetadata... types) {
-		List<CustomTypeMetadata> typeList = Arrays.asList( types );
-		IndexedTypeSet entityTypes = typeList.stream()
-				.map( CustomTypeMetadata::getEntityType )
-				.collect( IndexedTypeSets.streamCollector() );
+	public HSQuery createHSQuery(Query luceneQuery, IndexedTypeMap<CustomTypeMetadata> types) {
+		IndexedTypeSet entityTypes = types.keySet();
 		QueryDescriptor descriptor = createQueryDescriptor( luceneQuery, entityTypes );
-		return descriptor.createHSQuery( this ).targetedTypes( typeList );
+		return descriptor.createHSQuery( this, types );
 	}
 
 	private QueryDescriptor createQueryDescriptor(Query luceneQuery, IndexedTypeSet entityTypes) {
@@ -337,20 +325,8 @@ public class ImmutableSearchFactory implements ExtendedSearchIntegratorWithShare
 	}
 
 	@Override
-	@Deprecated
-	public EntityIndexBinding getIndexBinding(Class<?> entityType) {
-		return indexBindingForEntities.get( new PojoIndexedTypeIdentifier( entityType ) );
-	}
-
-	@Override
 	public EntityIndexBinding getIndexBinding(IndexedTypeIdentifier entityType) {
 		return indexBindingForEntities.get( entityType );
-	}
-
-	@Override
-	@Deprecated
-	public DocumentBuilderContainedEntity getDocumentBuilderContainedEntity(Class entityType) {
-		return documentBuildersContainedEntities.get( entityType );
 	}
 
 	@Override
@@ -376,18 +352,9 @@ public class ImmutableSearchFactory implements ExtendedSearchIntegratorWithShare
 	}
 
 	@Override
-	@Deprecated
-	public void optimize(Class entityType) {
-		EntityIndexBinding entityIndexBinding = getSafeIndexBindingForEntity( entityType );
-		for ( IndexManager im : entityIndexBinding.getIndexManagers() ) {
-			im.optimize();
-		}
-	}
-
-	@Override
 	public void optimize(IndexedTypeIdentifier entityType) {
 		EntityIndexBinding entityIndexBinding = getSafeIndexBindingForEntity( entityType );
-		for ( IndexManager im : entityIndexBinding.getIndexManagers() ) {
+		for ( IndexManager im : entityIndexBinding.getIndexManagerSelector().all() ) {
 			im.optimize();
 		}
 	}
@@ -422,22 +389,8 @@ public class ImmutableSearchFactory implements ExtendedSearchIntegratorWithShare
 	}
 
 	@Override
-	@Deprecated
-	public Analyzer getAnalyzer(Class<?> clazz) {
-		return getAnalyzerReference( clazz ).unwrap( LuceneAnalyzerReference.class ).getAnalyzer();
-	}
-
-	@Override
 	public Analyzer getAnalyzer(IndexedTypeIdentifier type) {
 		return getAnalyzerReference( type ).unwrap( LuceneAnalyzerReference.class ).getAnalyzer();
-	}
-
-	@Override
-	@Deprecated
-	public ScopedAnalyzerReference getAnalyzerReference(Class<?> clazz) {
-		EntityIndexBinding entityIndexBinding = getSafeIndexBindingForEntity( clazz );
-		DocumentBuilderIndexedEntity builder = entityIndexBinding.getDocumentBuilder();
-		return builder.getAnalyzerReference();
 	}
 
 	@Override
@@ -493,20 +446,8 @@ public class ImmutableSearchFactory implements ExtendedSearchIntegratorWithShare
 	}
 
 	@Override
-	@Deprecated
-	public IndexedTypeSet getConfiguredTypesPolymorphic(Class<?>[] types) {
-		return getConfiguredTypesPolymorphic( IndexedTypeSets.fromClasses( types ) );
-	}
-
-	@Override
 	public IndexedTypeSet getConfiguredTypesPolymorphic(IndexedTypeSet types) {
 		return configuredTypeHierarchy.getConfiguredClasses( types );
-	}
-
-	@Override
-	@Deprecated
-	public IndexedTypeSet getIndexedTypesPolymorphic(Class<?>[] types) {
-		return getIndexedTypesPolymorphic( IndexedTypeSets.fromClasses( types ) );
 	}
 
 	@Override
@@ -601,7 +542,7 @@ public class ImmutableSearchFactory implements ExtendedSearchIntegratorWithShare
 		if ( entityType == null ) {
 			throw log.nullIsInvalidIndexedType();
 		}
-		EntityIndexBinding entityIndexBinding = getIndexBinding( entityType );
+		EntityIndexBinding entityIndexBinding = getIndexBindings().get( entityType );
 		if ( entityIndexBinding == null ) {
 			throw log.notAnIndexedType( entityType.getName() );
 		}
@@ -630,13 +571,6 @@ public class ImmutableSearchFactory implements ExtendedSearchIntegratorWithShare
 	}
 
 	@Override
-	@Deprecated
-	public IndexedTypeDescriptor getIndexedTypeDescriptor(Class<?> classType) {
-		final IndexedTypeIdentifier type = new PojoIndexedTypeIdentifier( classType );
-		return getIndexedTypeDescriptor( type );
-	}
-
-	@Override
 	public IndexedTypeDescriptor getIndexedTypeDescriptor(IndexedTypeIdentifier type) {
 		IndexedTypeDescriptor typeDescriptor = indexedTypeDescriptors.get( type );
 		if ( typeDescriptor == null ) {
@@ -647,20 +581,14 @@ public class ImmutableSearchFactory implements ExtendedSearchIntegratorWithShare
 			}
 			else {
 				indexedTypeDescriptor = new IndexedTypeDescriptorImpl(
-						indexBinder.getDocumentBuilder().getMetadata(),
-						indexBinder.getIndexManagers()
+						indexBinder.getDocumentBuilder().getTypeMetadata(),
+						indexBinder.getIndexManagerSelector().all()
 				);
 			}
 			indexedTypeDescriptors.put( type, indexedTypeDescriptor );
 			typeDescriptor = indexedTypeDescriptor;
 		}
 		return typeDescriptor;
-	}
-
-	@Deprecated
-	@Override
-	public Set<Class<?>> getIndexedTypes() {
-		return indexBindingForEntities.keySet().toPojosSet();
 	}
 
 	@Override
@@ -752,11 +680,6 @@ public class ImmutableSearchFactory implements ExtendedSearchIntegratorWithShare
 	@Override
 	public LuceneWorkSerializer getWorkSerializerState() {
 		return workSerializer;
-	}
-
-	@Override
-	public HSQuery createLuceneBasedHSQuery() {
-		return new LuceneHSQuery( this );
 	}
 
 	@Override

@@ -6,9 +6,13 @@
  */
 package org.hibernate.search.elasticsearch.impl;
 
+import org.hibernate.search.elasticsearch.query.impl.ElasticsearchHSQueryImpl;
 import org.hibernate.search.engine.integration.impl.ExtendedSearchIntegrator;
 import org.hibernate.search.query.engine.spi.HSQuery;
 import org.hibernate.search.query.engine.spi.QueryDescriptor;
+import org.hibernate.search.spi.CustomTypeMetadata;
+import org.hibernate.search.spi.IndexedTypeMap;
+import org.hibernate.search.spi.IndexedTypeSet;
 import org.hibernate.search.spi.SearchIntegrator;
 
 import com.google.gson.JsonObject;
@@ -31,8 +35,13 @@ public class ElasticsearchJsonQueryDescriptor implements QueryDescriptor {
 	}
 
 	@Override
-	public HSQuery createHSQuery(SearchIntegrator searchIntegrator) {
-		return new ElasticsearchHSQueryImpl( rawSearchPayload, searchIntegrator.unwrap( ExtendedSearchIntegrator.class ) );
+	public HSQuery createHSQuery(SearchIntegrator integrator, IndexedTypeSet types) {
+		return new ElasticsearchHSQueryImpl( rawSearchPayload, integrator.unwrap( ExtendedSearchIntegrator.class ), types );
+	}
+
+	@Override
+	public HSQuery createHSQuery(SearchIntegrator integrator, IndexedTypeMap<CustomTypeMetadata> types) {
+		return new ElasticsearchHSQueryImpl( rawSearchPayload, integrator.unwrap( ExtendedSearchIntegrator.class ), types );
 	}
 
 	@Override

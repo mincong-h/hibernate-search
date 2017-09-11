@@ -7,6 +7,7 @@
 package org.hibernate.search.elasticsearch.client.impl;
 
 import java.util.Properties;
+import java.util.concurrent.TimeUnit;
 
 import org.apache.http.auth.AuthScope;
 import org.apache.http.auth.UsernamePasswordCredentials;
@@ -21,12 +22,16 @@ import org.elasticsearch.client.sniff.Sniffer;
 import org.elasticsearch.client.sniff.SnifferBuilder;
 import org.hibernate.search.elasticsearch.cfg.ElasticsearchEnvironment;
 import org.hibernate.search.elasticsearch.client.spi.ElasticsearchHttpClientConfigurer;
+import org.hibernate.search.elasticsearch.gson.impl.DefaultGsonProvider;
+import org.hibernate.search.elasticsearch.gson.impl.GsonProvider;
 import org.hibernate.search.engine.service.spi.ServiceManager;
 import org.hibernate.search.engine.service.spi.Startable;
 import org.hibernate.search.engine.service.spi.Stoppable;
 import org.hibernate.search.spi.BuildContext;
 import org.hibernate.search.util.configuration.impl.ConfigurationParseHelper;
 import org.hibernate.search.util.impl.SearchThreadFactory;
+
+import com.google.gson.GsonBuilder;
 
 /**
  * @author Gunnar Morling
@@ -48,12 +53,23 @@ public class DefaultElasticsearchClientFactory implements ElasticsearchClientFac
 
 	@Override
 	public ElasticsearchClientImplementor create(Properties properties) {
-		RestClient restClient = createClient( properties );
+		int requestTimeoutMs = ConfigurationParseHelper.getIntValue(
+				properties,
+				ElasticsearchEnvironment.SERVER_REQUEST_TIMEOUT,
+				ElasticsearchEnvironment.Defaults.SERVER_REQUEST_TIMEOUT
+		);
+
+		RestClient restClient = createClient( properties, requestTimeoutMs );
 		Sniffer sniffer = createSniffer( restClient, properties );
-		return new DefaultElasticsearchClient( restClient, sniffer );
+
+		boolean logPrettyPrinting = ConfigurationParseHelper.getBooleanValue( properties,
+				ElasticsearchEnvironment.LOG_JSON_PRETTY_PRINTING, ElasticsearchEnvironment.Defaults.LOG_JSON_PRETTY_PRINTING );
+		GsonProvider initialGsonProvider = DefaultGsonProvider.create( GsonBuilder::new, logPrettyPrinting );
+
+		return new DefaultElasticsearchClient( restClient, sniffer, requestTimeoutMs, TimeUnit.MILLISECONDS, initialGsonProvider );
 	}
 
-	private RestClient createClient(Properties properties) {
+	private RestClient createClient(Properties properties, int maxRetryTimeoutMillis) {
 		String serverUrisString = ConfigurationParseHelper.getString(
 				properties,
 				ElasticsearchEnvironment.SERVER_URI,
@@ -63,15 +79,12 @@ public class DefaultElasticsearchClientFactory implements ElasticsearchClientFac
 
 		return RestClient.builder( hosts.asHostsArray() )
 				/*
-				 * Note: this timeout is not only used on retries,
-				 * but also when executing requests synchronously.
+				 * Note: this timeout is currently only used on retries,
+				 * but should we start using the synchronous methods of RestClient,
+				 * it would be applied to synchronous requests too.
 				 * See https://github.com/elastic/elasticsearch/issues/21789#issuecomment-287399115
 				 */
-				.setMaxRetryTimeoutMillis( ConfigurationParseHelper.getIntValue(
-						properties,
-						ElasticsearchEnvironment.SERVER_REQUEST_TIMEOUT,
-						ElasticsearchEnvironment.Defaults.SERVER_REQUEST_TIMEOUT
-				) )
+				.setMaxRetryTimeoutMillis( maxRetryTimeoutMillis )
 				.setRequestConfigCallback( (b) -> customizeRequestConfig( properties, b ) )
 				.setHttpClientConfigCallback( (b) -> customizeHttpClientConfig( properties, hosts, b ) )
 				.build();

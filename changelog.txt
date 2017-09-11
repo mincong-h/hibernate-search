@@ -1,6 +1,85 @@
 Hibernate Search Changelog
 ==========================
 
+5.8.0.CR1 (15-08-2017)
+-------------------------
+
+** Bug
+    * HSEARCH-2843 Changing the limit/offset of a query does not clear the cached results
+    * HSEARCH-2839 Projecting on a default field whose type was overridden in the bridge fails with Elasticsearch
+    * HSEARCH-2823 The elasticsearch-aws JAR and its dependencies are missing from the .tar.gz/zip distributions
+    * HSEARCH-2196 Amazon AWS Elasticsearch Integration Test failures
+
+** Improvement
+    * HSEARCH-2840 Allow Elasticsearch projection on field bridges making use of dynamic object fields
+    * HSEARCH-2837 Clarify errors when interrupted during submission of work to the ES client
+    * HSEARCH-2833 Avoid confusing variable uses (bad naming, no declaration) in the documentation
+    * HSEARCH-2818 Optimise encoding of GSON elements into HTTP client buffers
+    * HSEARCH-2764 Improve orchestration of Elasticsearch works
+    * HSEARCH-2640 Improve resilience of cleanup methods (close, etc.)
+
+** Task
+    * HSEARCH-2846 Update build to be able to test with Java 9 preview build 9+181
+    * HSEARCH-2845 Add dependency management entries for the dependencypath plugin and jsonassert
+    * HSEARCH-2844 Remove requirement for CLA
+    * HSEARCH-2842 Verify and document interaction of full-text queries with an ORM filter
+    * HSEARCH-2841 Clean up the ElasticsearchHSQueryImpl code
+    * HSEARCH-2838 Add a maxConnection parameter to Elasticsearch performance tests
+    * HSEARCH-2834 Upgrade Elasticsearch versions to 5.5.1 and 2.4.6
+    * HSEARCH-2831 Clarify how to disable Elasticsearch/AWS digest signature
+    * HSEARCH-2830 Extend Elasticsearch performance tests for better orchestration testing
+    * HSEARCH-2828 Make WorkerTestCase wait for async works to finish
+    * HSEARCH-2827 Make WorkerTestCase fail if a background error occurs
+    * HSEARCH-2822 Automatically activate the JBoss Logging AP when importing project in IDEA
+    * HSEARCH-2821 Improve JSON rendering: better StringBuilder usage and logging
+    * HSEARCH-2816 Make sure Elasticsearch performance tests apply update/delete works to existing documents and add works to non-existing documents
+    * HSEARCH-2806 Remove method org.hibernate.search.engine.spi.EntityIndexBinding.getIndexManagers
+    * HSEARCH-2801 QueryDescriptor requires a List<CustomTypeParameter> where a Set or Map would make more sense
+
+5.8.0.Beta4 (12-07-2017)
+-------------------------
+
+** Bug
+    * HSEARCH-2785 Phrase/match queries on normalized fields built using the DSL fail on Elasticsearch
+    * HSEARCH-2777 javax.persistence is no longer an optional dependency of hibernate-search-orm in OSGi environments
+    * HSEARCH-2776 javax.transaction is not an optional dependency of hibernate-search-engine in OSGi environments
+
+** Improvement
+    * HSEARCH-2783 Deprecate no longer useful buffer_size_on_copy configuration property
+    * HSEARCH-2774 The default build should include documentation
+    * HSEARCH-2700 Decide how simpleQueryString() should behave with null or empty input
+    * HSEARCH-2682 Unit test DefaultElasticsearchClientFactoryTest.multipleHosts_failover_fault fails randomly because the timeout is too low
+
+** New Feature
+    * HSEARCH-2772 Add an elasticsearch-aws module
+
+** Patch
+    * HSEARCH-2810 Micro formatting issues in the documentation
+
+** Task
+    * HSEARCH-2813 Add Elasticsearch performance tests
+    * HSEARCH-2812 IdUniquenessResolver SPI needs to migrate to new type system
+    * HSEARCH-2811 Avoid using Lucene deprecated methods when not essential for 5.8 API
+    * HSEARCH-2809 Upgrade to Elasticsearch 5.5.0
+    * HSEARCH-2808 Avoid using deprecated methods from Hibernate ORM 5.2
+    * HSEARCH-2807 DSLTest numeric tests use order-sensitive assertions on queries without a sort
+    * HSEARCH-2805 Upgrade to Checkstyle 8.0
+    * HSEARCH-2804 Prepare for Checkstyle 8 updates
+    * HSEARCH-2802 Make sure the default elasticsearch profile will only be enabled if the ES version is not provided
+    * HSEARCH-2794 Reorganize/rename performance testing modules
+    * HSEARCH-2793 Upgrade Elasticsearch version used for 2.x tests to 2.4.5
+    * HSEARCH-2792 Rename DslCrossHierarchyTest to ObjectLoadingCrossHierarchyTest
+    * HSEARCH-2791 Fix integration tests failing on non-H2 databases due to mapping specifics
+    * HSEARCH-2790 Upgrade to Elasticsearch 5.4.2
+    * HSEARCH-2789 Test that the CREATE strategy actually doesn't create mappings when the index already exists
+    * HSEARCH-2788 Remove unnecessary calls to Thread.sleep in CDI/Wildfly tests
+    * HSEARCH-2787 Replace INFO blocks in the documentation with valid styles
+    * HSEARCH-2781 Rework internals of sharding to make it possible for backends not to rely on Class<?>
+    * HSEARCH-2775 Migrate internal file helpers and SPIs from File to NIO APIs
+    * HSEARCH-2770 Remove (deprecated) methods using Class<?> as indexed type identifier in the engine SPIs
+    * HSEARCH-2528 Document the dynamic mapping feature
+    * HSEARCH-2369 HSQuery.targetedEntities(List<Class<?>>) won't always work when using multiple backends 
+
 5.8.0.Beta3 (13-06-2017)
 -------------------------
 

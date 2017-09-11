@@ -14,18 +14,19 @@ import org.apache.lucene.search.Query;
 import org.apache.lucene.search.SortField;
 import org.hibernate.search.analyzer.spi.AnalyzerReference;
 import org.hibernate.search.elasticsearch.cfg.ElasticsearchEnvironment;
+import org.hibernate.search.elasticsearch.client.impl.ElasticsearchRequest;
+import org.hibernate.search.elasticsearch.client.impl.ElasticsearchResponse;
 import org.hibernate.search.elasticsearch.schema.impl.ElasticsearchSchemaValidationException;
-import org.hibernate.search.elasticsearch.work.impl.BulkRequestFailedException;
-import org.hibernate.search.elasticsearch.work.impl.BulkableElasticsearchWork;
 import org.hibernate.search.exception.SearchException;
+import org.hibernate.search.spi.IndexedTypeIdentifier;
 import org.hibernate.search.util.logging.impl.ClassFormatter;
+import org.hibernate.search.util.logging.impl.IndexedTypeIdentifierFormatter;
 import org.jboss.logging.Logger.Level;
 import org.jboss.logging.annotations.Cause;
 import org.jboss.logging.annotations.FormatWith;
 import org.jboss.logging.annotations.LogMessage;
 import org.jboss.logging.annotations.Message;
 import org.jboss.logging.annotations.MessageLogger;
-import org.jboss.logging.annotations.Param;
 
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
@@ -40,7 +41,7 @@ public interface Log extends org.hibernate.search.util.logging.impl.Log {
 
 	@Message(id = ES_BACKEND_MESSAGES_START_ID + 1,
 			value = "Cannot execute query '%2$s', as targeted entity type '%1$s' is not mapped to an Elasticsearch index")
-	SearchException cannotRunEsQueryTargetingEntityIndexedWithNonEsIndexManager(@FormatWith(ClassFormatter.class) Class<?> entityType, String query);
+	SearchException cannotRunEsQueryTargetingEntityIndexedWithNonEsIndexManager(@FormatWith(IndexedTypeIdentifierFormatter.class) IndexedTypeIdentifier entityType, String query);
 
 	@Message(id = ES_BACKEND_MESSAGES_START_ID + 2,
 			value = "Lucene query '%1$s' cannot be transformed into equivalent Elasticsearch query" )
@@ -59,25 +60,30 @@ public interface Log extends org.hibernate.search.util.logging.impl.Log {
 	SearchException cannotQueryOnEmptyPhraseQuery();
 
 	@Message(id = ES_BACKEND_MESSAGES_START_ID + 7,
-			value = "Elasticsearch request failed.\n Request:\n========\n%1$sResponse:\n=========\n%2$s"
+			value = "Elasticsearch request failed\nRequest:\n========\n%1$sResponse:\n=========\n%2$s"
 	)
-	SearchException elasticsearchRequestFailed(String request, String response, @Cause Exception cause);
+	SearchException elasticsearchRequestFailed(
+			@FormatWith( ElasticsearchRequestFormatter.class ) ElasticsearchRequest request,
+			@FormatWith( ElasticsearchResponseFormatter.class ) ElasticsearchResponse response,
+			@Cause Exception cause);
 
-	// The bounds on wildcards below are necessary for the logger code generation to work
 	@Message(id = ES_BACKEND_MESSAGES_START_ID + 8,
-			value = "Elasticsearch request failed.\n Request:\n========\n%1$sResponse:\n=========\n%2$s"
+			value = "Elasticsearch bulked request failed\nRequest:\n========\n%1$s\n%2$sResponse:\n=========\n%3$s"
 	)
-	BulkRequestFailedException elasticsearchBulkRequestFailed(String request, String response,
-			@Param Map<BulkableElasticsearchWork<?>, JsonObject> successfulItems, @Param List<BulkableElasticsearchWork<?>> erroneousItems);
+	SearchException elasticsearchBulkedRequestFailed(
+			@FormatWith( ElasticsearchJsonObjectFormatter.class ) JsonObject requestMetadata,
+			@FormatWith( ElasticsearchJsonObjectFormatter.class ) JsonObject requestBody,
+			@FormatWith( ElasticsearchJsonObjectFormatter.class ) JsonObject response,
+			@Cause Exception cause);
 
 	@LogMessage(level = Level.WARN)
 	@Message(id = ES_BACKEND_MESSAGES_START_ID + 9,
 			value = "Field '%2$s' in '%1$s' requires an Elasticsearch analyzer reference (got '%3$s' instead). The analyzer will be ignored.")
-	void analyzerIsNotElasticsearch(@FormatWith(ClassFormatter.class) Class<?> entityType, String fieldName, AnalyzerReference analyzerReference);
+	void analyzerIsNotElasticsearch(@FormatWith(IndexedTypeIdentifierFormatter.class) IndexedTypeIdentifier entityType, String fieldName, AnalyzerReference analyzerReference);
 
 	@Message(id = ES_BACKEND_MESSAGES_START_ID + 10,
-			value = "Elasticsearch connection time-out; check the cluster status, it should be 'green';\n Request:\n========\n%1$sResponse:\n=========\n%2$s" )
-	SearchException elasticsearchRequestTimeout(String request, String response);
+			value = "Elasticsearch connection time-out; check the cluster status, it should be 'green'" )
+	SearchException elasticsearchRequestTimeout();
 
 	@Message(id = ES_BACKEND_MESSAGES_START_ID + 11,
 			value = "Projection of non-JSON-primitive field values is not supported: '%1$s'")
@@ -118,7 +124,7 @@ public interface Log extends org.hibernate.search.util.logging.impl.Log {
 					+ "If you used a custom field bridge, make sure it implements MetadataProvidingFieldBridge"
 					+ " and provides metadata for this field."
 	)
-	SearchException unexpectedNumericEncodingType(String entityType, String fieldName);
+	SearchException unexpectedNumericEncodingType(@FormatWith(IndexedTypeIdentifierFormatter.class) IndexedTypeIdentifier entityType, String fieldName);
 
 	@Message(id = ES_BACKEND_MESSAGES_START_ID + 20,
 			value = "Could not create mapping for entity type %1$s"
@@ -183,7 +189,7 @@ public interface Log extends org.hibernate.search.util.logging.impl.Log {
 	@Message(id = ES_BACKEND_MESSAGES_START_ID + 32,
 			value = "@DynamicBoost is not supported with Elasticsearch. Ignoring boost strategy '%1$s' for entity '%2$s' (field path '%3$s')."
 	)
-	void unsupportedDynamicBoost(Class<?> boostStrategyType, Class<?> entityType, String fieldPath);
+	void unsupportedDynamicBoost(Class<?> boostStrategyType, @FormatWith(IndexedTypeIdentifierFormatter.class) IndexedTypeIdentifier entityType, String fieldPath);
 
 	@Message(id = ES_BACKEND_MESSAGES_START_ID + 33,
 			value = "An Elasticsearch schema validation failed: %1$s"
@@ -209,7 +215,7 @@ public interface Log extends org.hibernate.search.util.logging.impl.Log {
 					+ " if that's the case, please set either @IndexedEmbedded.prefix or @Field.name to a custom value"
 					+ " different from the default to resolve the conflict."
 	)
-	SearchException fieldIsBothCompositeAndConcrete(Class<?> entityType, String fieldPath);
+	SearchException fieldIsBothCompositeAndConcrete(@FormatWith(IndexedTypeIdentifierFormatter.class) IndexedTypeIdentifier entityType, String fieldPath);
 
 	@Message(id = ES_BACKEND_MESSAGES_START_ID + 37,
 			value = "The 'indexNullAs' property for Period fields must represent a date interval in ISO-8601"
@@ -290,8 +296,9 @@ public interface Log extends org.hibernate.search.util.logging.impl.Log {
 
 	@LogMessage(level = Level.DEBUG)
 	@Message(id = ES_BACKEND_MESSAGES_START_ID + 53,
-			value = "Executing Elasticsearch query on '%s' with parameters '%s' :\n%s" )
-	void executingElasticsearchQuery(String path, Map<String, String> parameters, String queryAsString);
+			value = "Executing Elasticsearch query on '%s' with parameters '%s': <%s>" )
+	void executingElasticsearchQuery(String path, Map<String, String> parameters,
+			String bodyParts);
 
 	@Message(id = ES_BACKEND_MESSAGES_START_ID + 54,
 			value = "Invalid field path detected for field '%2$s' on entity '%1$s':"
@@ -301,7 +308,7 @@ public interface Log extends org.hibernate.search.util.logging.impl.Log {
 					+ " This is not supported with the Elasticsearch indexing service: please only add suffixes to the name"
 					+ " passed as a parameter to the various bridge methods and never ignore this name."
 	)
-	SearchException indexedEmbeddedPrefixBypass(Class<?> entityType, String fieldPath, String expectedParent);
+	SearchException indexedEmbeddedPrefixBypass(@FormatWith(IndexedTypeIdentifierFormatter.class) IndexedTypeIdentifier entityType, String fieldPath, String expectedParent);
 
 	@Message(id = ES_BACKEND_MESSAGES_START_ID + 55,
 			value = "The same tokenizer name '%1$s' is assigned to multiple definitions. The tokenizer names must be unique."
@@ -394,10 +401,8 @@ public interface Log extends org.hibernate.search.util.logging.impl.Log {
 			value = "DeleteByQuery request to Elasticsearch failed with 404 result code."
 					+ "\nPlease check that 1. you installed the delete-by-query plugin on your Elasticsearch nodes"
 					+ " and 2. the targeted index exists"
-					+ "\n Request:\n========\n%1$s"
-					+ "Response:\n=========\n%2$s"
 			)
-	SearchException elasticsearch2RequestDeleteByQueryNotFound(String request, String response);
+	SearchException elasticsearch2RequestDeleteByQueryNotFound();
 
 	@LogMessage(level = Level.WARN)
 	@Message(id = ES_BACKEND_MESSAGES_START_ID + 73,
@@ -442,11 +447,13 @@ public interface Log extends org.hibernate.search.util.logging.impl.Log {
 					+ " Please refer to the documentation to know which versions are supported." )
 	SearchException unsupportedElasticsearchVersion(String name);
 
-	@LogMessage(level = Level.TRACE)
+	@LogMessage(level = Level.DEBUG)
 	@Message(id = ES_BACKEND_MESSAGES_START_ID + 82,
-			value = "Executed Elasticsearch HTTP request to path '%s' with query parameters %s in %dms"
+			value = "Executed Elasticsearch HTTP %s request to path '%s' with query parameters %s in %dms."
+					+ " Response had status %d '%s'."
 	)
-	void executedRequest(String path, Map<String, String> getParameters, long timeInMs);
+	void executedRequest(String method, String path, Map<String, String> getParameters, long timeInMs,
+			int responseStatusCode, String responseStatusMessage);
 
 	@Message(id = ES_BACKEND_MESSAGES_START_ID + 83,
 			value = "For simple query string queries, Elasticsearch does not support overriding fields with more than one different analyzers: %1$s.")
@@ -476,4 +483,31 @@ public interface Log extends org.hibernate.search.util.logging.impl.Log {
 					+ " there are no built-in normalizers in Elasticsearch."
 					+ " Use @Normalizer(definition = \"...\") instead." )
 	SearchException cannotUseNormalizerImpl(@FormatWith(ClassFormatter.class) Class<?> analyzerType);
+
+	@Message(id = ES_BACKEND_MESSAGES_START_ID + 89,
+			value = "Failed to parse Elasticsearch response. Status code was '%1$d', status phrase was '%2$s'." )
+	SearchException failedToParseElasticsearchResponse(int statusCode, String statusPhrase, @Cause Exception cause);
+
+	@Message(id = ES_BACKEND_MESSAGES_START_ID + 90,
+			value = "Elasticsearch response indicates a failure." )
+	SearchException elasticsearchResponseIndicatesFailure();
+
+	@Message(id = ES_BACKEND_MESSAGES_START_ID + 91,
+			value = "The thread was interrupted while a changeset was being submitted to '%1$s'."
+					+ " The changeset has been discarded." )
+	SearchException threadInterruptedWhileSubmittingChangeset(String orchestratorName);
+
+	@Message(id = ES_BACKEND_MESSAGES_START_ID + 92,
+			value = "A changeset was submitted after Hibernate Search shutdown was requested to '%1$s'."
+					+ " The changeset has been discarded." )
+	SearchException orchestratorShutDownBeforeSubmittingChangeset(String orchestratorName);
+
+	@LogMessage(level = Level.TRACE)
+	@Message(id = ES_BACKEND_MESSAGES_START_ID + 93,
+		value = "Executed Elasticsearch HTTP %s request to path '%s' with query parameters %s in %dms."
+				+ " Response had status %d '%s'. Request body: <%s>. Response body: <%s>"
+	)
+	void executedRequest(String method, String path, Map<String, String> getParameters, long timeInMs,
+			int responseStatusCode, String responseStatusMessage,
+			String requestBodyParts, String responseBody);
 }

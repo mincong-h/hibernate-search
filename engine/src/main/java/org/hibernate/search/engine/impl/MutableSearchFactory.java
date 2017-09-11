@@ -8,7 +8,6 @@ package org.hibernate.search.engine.impl;
 
 import java.util.Map;
 import java.util.Properties;
-import java.util.Set;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Predicate;
@@ -88,17 +87,6 @@ public class MutableSearchFactory implements ExtendedSearchIntegratorWithShareab
 	}
 
 	@Override
-	@Deprecated
-	public EntityIndexBinding getIndexBinding(Class<?> entityType) {
-		return delegate.getIndexBinding( entityType );
-	}
-
-	@Override
-	public DocumentBuilderContainedEntity getDocumentBuilderContainedEntity(Class<?> entityType) {
-		return delegate.getDocumentBuilderContainedEntity( entityType );
-	}
-
-	@Override
 	public Worker getWorker() {
 		return delegate.getWorker();
 	}
@@ -134,12 +122,6 @@ public class MutableSearchFactory implements ExtendedSearchIntegratorWithShareab
 	}
 
 	@Override
-	@Deprecated
-	public String getIndexingStrategy() {
-		return delegate.getIndexingMode().toExternalRepresentation();
-	}
-
-	@Override
 	public IndexingMode getIndexingMode() {
 		return delegate.getIndexingMode();
 	}
@@ -155,25 +137,13 @@ public class MutableSearchFactory implements ExtendedSearchIntegratorWithShareab
 	}
 
 	@Override
-	public HSQuery createHSQuery(Query luceneQuery, CustomTypeMetadata... types) {
+	public HSQuery createHSQuery(Query luceneQuery, IndexedTypeMap<CustomTypeMetadata> types) {
 		return delegate.createHSQuery( luceneQuery, types );
 	}
 
 	@Override
 	public int getFilterCacheBitResultsSize() {
 		return delegate.getFilterCacheBitResultsSize();
-	}
-
-	@Override
-	@Deprecated
-	public IndexedTypeSet getConfiguredTypesPolymorphic(Class<?>[] classes) {
-		return delegate.getConfiguredTypesPolymorphic( classes );
-	}
-
-	@Override
-	@Deprecated
-	public IndexedTypeSet getIndexedTypesPolymorphic(Class<?>[] classes) {
-		return delegate.getIndexedTypesPolymorphic( classes );
 	}
 
 	@Override
@@ -222,12 +192,6 @@ public class MutableSearchFactory implements ExtendedSearchIntegratorWithShareab
 	}
 
 	@Override
-	@Deprecated
-	public void optimize(Class entityType) {
-		delegate.optimize( entityType );
-	}
-
-	@Override
 	public void optimize(IndexedTypeIdentifier entityType) {
 		delegate.optimize( entityType );
 	}
@@ -243,20 +207,8 @@ public class MutableSearchFactory implements ExtendedSearchIntegratorWithShareab
 	}
 
 	@Override
-	@Deprecated
-	public Analyzer getAnalyzer(Class<?> clazz) {
-		return delegate.getAnalyzer( clazz );
-	}
-
-	@Override
 	public Analyzer getAnalyzer(IndexedTypeIdentifier type) {
 		return delegate.getAnalyzer( type );
-	}
-
-	@Override
-	@Deprecated
-	public ScopedAnalyzerReference getAnalyzerReference(Class<?> clazz) {
-		return delegate.getAnalyzerReference( clazz );
 	}
 
 	@Override
@@ -322,16 +274,6 @@ public class MutableSearchFactory implements ExtendedSearchIntegratorWithShareab
 	@Override
 	public IndexReaderAccessor getIndexReaderAccessor() {
 		return delegate.getIndexReaderAccessor();
-	}
-
-	@Override
-	public IndexedTypeDescriptor getIndexedTypeDescriptor(Class<?> entityType) {
-		return delegate.getIndexedTypeDescriptor( entityType );
-	}
-
-	@Override
-	public Set<Class<?>> getIndexedTypes() {
-		return delegate.getIndexedTypes();
 	}
 
 	@Override
@@ -417,11 +359,6 @@ public class MutableSearchFactory implements ExtendedSearchIntegratorWithShareab
 	@Override
 	public LuceneWorkSerializer getWorkSerializerState() {
 		return delegate.getWorkSerializerState();
-	}
-
-	@Override
-	public HSQuery createLuceneBasedHSQuery() {
-		return delegate.createLuceneBasedHSQuery();
 	}
 
 	@Override

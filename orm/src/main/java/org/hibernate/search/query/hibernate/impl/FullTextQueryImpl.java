@@ -29,7 +29,6 @@ import org.hibernate.HibernateException;
 import org.hibernate.LockMode;
 import org.hibernate.LockOptions;
 import org.hibernate.ScrollMode;
-import org.hibernate.Session;
 import org.hibernate.TypeMismatchException;
 import org.hibernate.engine.spi.SessionImplementor;
 import org.hibernate.hql.internal.QueryExecutionRequestException;
@@ -84,7 +83,7 @@ public class FullTextQueryImpl extends AbstractProducedQuery implements FullText
 	/**
 	 * Constructs a  <code>FullTextQueryImpl</code> instance.
 	 *
-	 * @param hSearchQuery The query, with the {@link HSQuery#targetedEntities(org.hibernate.search.spi.IndexedTypeSet) targeted entities} already set if necessary.
+	 * @param hSearchQuery The query
 	 * @param session Access to the Hibernate session.
 	 * @param parameterMetadata Additional query metadata.
 	 */
@@ -181,7 +180,7 @@ public class FullTextQueryImpl extends AbstractProducedQuery implements FullText
 	private Loader getProjectionLoader(ObjectLoaderBuilder loaderBuilder) {
 		ProjectionLoader loader = new ProjectionLoader();
 		loader.init(
-				(Session) session,
+				session,
 				hSearchQuery.getExtendedSearchIntegrator(),
 				resultTransformer,
 				loaderBuilder,
@@ -471,6 +470,7 @@ public class FullTextQueryImpl extends AbstractProducedQuery implements FullText
 		throw new UnsupportedOperationException( "Lock options are not implemented in Hibernate Search queries" );
 	}
 
+	@Deprecated
 	@Override
 	public FullTextQueryImpl setResultTransformer(ResultTransformer transformer) {
 		super.setResultTransformer( transformer );
@@ -588,21 +588,25 @@ public class FullTextQueryImpl extends AbstractProducedQuery implements FullText
 		return false;
 	}
 
+	@Deprecated
 	@Override
 	public Type[] getReturnTypes() {
 		throw new UnsupportedOperationException( "getReturnTypes() is not implemented in Hibernate Search queries" );
 	}
 
+	@Deprecated
 	@Override
 	public String[] getReturnAliases() {
 		throw new UnsupportedOperationException( "getReturnAliases() is not implemented in Hibernate Search queries" );
 	}
 
+	@Deprecated
 	@Override
 	public FullTextQueryImpl setEntity(int position, Object val) {
 		throw new UnsupportedOperationException( "setEntity(int,Object) is not implemented in Hibernate Search queries" );
 	}
 
+	@Deprecated
 	@Override
 	public FullTextQueryImpl setEntity(String name, Object val) {
 		throw new UnsupportedOperationException( "setEntity(String,Object) is not implemented in Hibernate Search queries" );
@@ -615,7 +619,7 @@ public class FullTextQueryImpl extends AbstractProducedQuery implements FullText
 
 	private static final Loader noLoader = new Loader() {
 		@Override
-		public void init(Session session,
+		public void init(SessionImplementor session,
 						ExtendedSearchIntegrator extendedIntegrator,
 						ObjectInitializer objectInitializer,
 						TimeoutManager timeoutManager) {

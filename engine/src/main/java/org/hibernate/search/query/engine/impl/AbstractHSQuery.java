@@ -9,11 +9,7 @@ package org.hibernate.search.query.engine.impl;
 import static org.hibernate.search.util.impl.CollectionHelper.newHashMap;
 
 import java.io.Serializable;
-import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collection;
-import java.util.Collections;
-import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Optional;
@@ -49,6 +45,7 @@ import org.hibernate.search.spi.IndexedTypeIdentifier;
 import org.hibernate.search.spi.IndexedTypeSet;
 import org.hibernate.search.spi.SearchIntegrator;
 import org.hibernate.search.spi.IndexedTypeMap;
+import org.hibernate.search.spi.impl.IndexedTypeMaps;
 import org.hibernate.search.spi.impl.IndexedTypeSets;
 import org.hibernate.search.util.StringHelper;
 import org.hibernate.search.util.impl.ClassLoaderHelper;
@@ -76,9 +73,9 @@ public abstract class AbstractHSQuery implements HSQuery, Serializable {
 	protected transient TimeoutExceptionFactory timeoutExceptionFactory;
 	protected transient TimeoutManagerImpl timeoutManager;
 
-	protected IndexedTypeSet targetedEntities;
-	protected IndexedTypeSet indexedTargetedEntities;
-	private List<CustomTypeMetadata> customTypeMetadata = Collections.emptyList();
+	protected final IndexedTypeSet targetedEntities;
+	protected final IndexedTypeSet indexedTargetedEntities;
+	private final IndexedTypeMap<CustomTypeMetadata> customTypeMetadata;
 
 	protected Sort sort;
 	protected String tenantId;
@@ -99,9 +96,38 @@ public abstract class AbstractHSQuery implements HSQuery, Serializable {
 	 */
 	protected final Map<String, FullTextFilterImpl> filterDefinitions = newHashMap();
 
-	public AbstractHSQuery(ExtendedSearchIntegrator extendedIntegrator) {
+	public AbstractHSQuery(ExtendedSearchIntegrator extendedIntegrator, IndexedTypeSet types) {
+		this( extendedIntegrator, types, IndexedTypeMaps.empty() );
+	}
+
+	public AbstractHSQuery(ExtendedSearchIntegrator extendedIntegrator, IndexedTypeMap<CustomTypeMetadata> types) {
+		this( extendedIntegrator, types.keySet(), types );
+	}
+
+	private AbstractHSQuery(ExtendedSearchIntegrator extendedIntegrator, IndexedTypeSet targetedEntities,
+			IndexedTypeMap<CustomTypeMetadata> customTypeMetadata) {
 		this.extendedIntegrator = extendedIntegrator;
 		this.timeoutExceptionFactory = extendedIntegrator.getDefaultTimeoutExceptionFactory();
+		if ( targetedEntities == null ) {
+			targetedEntities = IndexedTypeSets.empty();
+		}
+		this.targetedEntities = targetedEntities;
+		this.indexedTargetedEntities = extendedIntegrator.getIndexedTypesPolymorphic( targetedEntities );
+		if ( targetedEntities.size() > 0 && indexedTargetedEntities.size() == 0 ) {
+			IndexedTypeSet configuredTargetEntities = extendedIntegrator.getConfiguredTypesPolymorphic( targetedEntities );
+			if ( configuredTargetEntities.isEmpty() ) {
+				throw LOG.targetedEntityTypesNotConfigured( StringHelper.join( targetedEntities, "," ) );
+			}
+			else {
+				throw LOG.targetedEntityTypesNotIndexed( StringHelper.join( targetedEntities, "," ) );
+			}
+		}
+		if ( customTypeMetadata == null ) {
+			this.customTypeMetadata = IndexedTypeMaps.empty();
+		}
+		else {
+			this.customTypeMetadata = customTypeMetadata;
+		}
 	}
 
 	@Override
@@ -124,47 +150,14 @@ public abstract class AbstractHSQuery implements HSQuery, Serializable {
 		return this;
 	}
 
-	@Override
-	public final HSQuery targetedEntities(IndexedTypeSet types) {
-		setTargetedEntities( types == null ? IndexedTypeSets.empty() : types );
-		this.customTypeMetadata = Collections.emptyList();
-		return this;
-	}
-
-	private void setTargetedEntities(IndexedTypeSet queryTarget) {
-		clearCachedResults();
-		this.targetedEntities = queryTarget;
-		this.indexedTargetedEntities = extendedIntegrator.getIndexedTypesPolymorphic( queryTarget );
-		if ( targetedEntities.size() > 0 && indexedTargetedEntities.size() == 0 ) {
-			IndexedTypeSet configuredTargetEntities = extendedIntegrator.getConfiguredTypesPolymorphic( queryTarget );
-			if ( configuredTargetEntities.isEmpty() ) {
-				throw LOG.targetedEntityTypesNotConfigured( StringHelper.join( targetedEntities, "," ) );
-			}
-			else {
-				throw LOG.targetedEntityTypesNotIndexed( StringHelper.join( targetedEntities, "," ) );
+	protected final Optional<CustomTypeMetadata> getCustomTypeMetadata(IndexedTypeIdentifier target) {
+		Class<?> targetPojoType = target.getPojoType();
+		for ( Map.Entry<IndexedTypeIdentifier, CustomTypeMetadata> entry : customTypeMetadata.entrySet() ) {
+			if ( entry.getKey().getPojoType().isAssignableFrom( targetPojoType ) ) {
+				return Optional.of( entry.getValue() );
 			}
 		}
-	}
-
-	@Override
-	public final HSQuery targetedTypes(List<CustomTypeMetadata> types) {
-		if ( types == null ) {
-			return targetedEntities( null );
-		}
-
-		IndexedTypeSet typesSet = types.stream()
-				.map( CustomTypeMetadata::getEntityType )
-				.collect( IndexedTypeSets.streamCollector() );
-		setTargetedEntities( typesSet );
-		this.customTypeMetadata = new ArrayList<>( types );
-
-		return this;
-	}
-
-	protected final Optional<CustomTypeMetadata> getCustomTypeMetadata(Class<?> clazz) {
-		return customTypeMetadata.stream()
-				.filter( metadata -> metadata.getEntityType().getPojoType().isAssignableFrom( clazz ) )
-				.findFirst();
+		return Optional.empty();
 	}
 
 	@Override
@@ -214,6 +207,7 @@ public abstract class AbstractHSQuery implements HSQuery, Serializable {
 
 	@Override
 	public HSQuery firstResult(int firstResult) {
+		clearCachedResults();
 		if ( firstResult < 0 ) {
 			throw new IllegalArgumentException( "'first' pagination parameter less than 0" );
 		}
@@ -223,6 +217,7 @@ public abstract class AbstractHSQuery implements HSQuery, Serializable {
 
 	@Override
 	public HSQuery maxResults(int maxResults) {
+		clearCachedResults();
 		if ( maxResults < 0 ) {
 			throw new IllegalArgumentException( "'max' pagination parameter less than 0" );
 		}
@@ -539,9 +534,9 @@ public abstract class AbstractHSQuery implements HSQuery, Serializable {
 		return facetMetadata;
 	}
 
-	protected List<IndexManager> getIndexManagers(EntityIndexBinding binding) {
+	protected Set<IndexManager> getIndexManagers(EntityIndexBinding binding) {
 		FullTextFilterImplementor[] fullTextFilters = getFullTextFilterImplementors();
-		List<IndexManager> indexManagers = Arrays.asList( binding.getSelectionStrategy().getIndexManagersForQuery( fullTextFilters ) );
+		Set<IndexManager> indexManagers = binding.getIndexManagerSelector().forFilters( fullTextFilters );
 		return indexManagers;
 	}
 

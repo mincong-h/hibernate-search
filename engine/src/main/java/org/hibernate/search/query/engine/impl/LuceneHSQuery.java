@@ -54,6 +54,7 @@ import org.hibernate.search.query.facet.FacetingRequest;
 import org.hibernate.search.reader.impl.MultiReaderFactory;
 import org.hibernate.search.spi.CustomTypeMetadata;
 import org.hibernate.search.spi.IndexedTypeIdentifier;
+import org.hibernate.search.spi.IndexedTypeMap;
 import org.hibernate.search.spi.IndexedTypeSet;
 import org.hibernate.search.util.impl.CollectionHelper;
 import org.hibernate.search.util.logging.impl.Log;
@@ -96,8 +97,16 @@ public class LuceneHSQuery extends AbstractHSQuery implements HSQuery {
 	 */
 	private Integer resultSize;
 
-	public LuceneHSQuery(ExtendedSearchIntegrator extendedIntegrator) {
-		super( extendedIntegrator );
+	public LuceneHSQuery(Query luceneQuery, ExtendedSearchIntegrator extendedIntegrator,
+			IndexedTypeSet types) {
+		super( extendedIntegrator, types );
+		this.luceneQuery = luceneQuery;
+	}
+
+	public LuceneHSQuery(Query luceneQuery, ExtendedSearchIntegrator extendedIntegrator,
+			IndexedTypeMap<CustomTypeMetadata> types) {
+		super( extendedIntegrator, types );
+		this.luceneQuery = luceneQuery;
 	}
 
 	@Override
@@ -281,8 +290,8 @@ public class LuceneHSQuery extends AbstractHSQuery implements HSQuery {
 	}
 
 	@Override
-	protected List<IndexManager> getIndexManagers(EntityIndexBinding binding) {
-		List<IndexManager> indexManagers = super.getIndexManagers( binding );
+	protected Set<IndexManager> getIndexManagers(EntityIndexBinding binding) {
+		Set<IndexManager> indexManagers = super.getIndexManagers( binding );
 
 		for ( IndexManager indexManager : indexManagers ) {
 			if ( !( indexManager instanceof DirectoryBasedIndexManager ) ) {
@@ -414,16 +423,16 @@ public class LuceneHSQuery extends AbstractHSQuery implements HSQuery {
 		//TODO check if caching this work for the last n list of indexedTargetedEntities makes a perf boost
 		for ( EntityIndexBinding entityIndexBinding : targetedEntityBindingsByName.values() ) {
 			DocumentBuilderIndexedEntity builder = entityIndexBinding.getDocumentBuilder();
-			Class<?> clazz = builder.getBeanClass();
+			IndexedTypeIdentifier typeIdentifier = builder.getTypeIdentifier();
 			searcherSimilarity = checkSimilarity( searcherSimilarity, entityIndexBinding.getSimilarity() );
 			if ( builder.getIdFieldName() != null ) {
 				idFieldNames.add( builder.getIdFieldName() );
 				allowFieldSelectionInProjection = allowFieldSelectionInProjection && builder.allowFieldSelectionInProjection();
 			}
 
-			List<IndexManager> indexManagers = getIndexManagers( entityIndexBinding );
+			Set<IndexManager> indexManagers = getIndexManagers( entityIndexBinding );
 			targetedIndexes.addAll( indexManagers );
-			Optional<CustomTypeMetadata> customTypeMetadata = getCustomTypeMetadata( clazz );
+			Optional<CustomTypeMetadata> customTypeMetadata = getCustomTypeMetadata( typeIdentifier );
 			collectSortableFields( sortConfigurations, indexManagers, builder.getTypeMetadata(), customTypeMetadata );
 		}
 

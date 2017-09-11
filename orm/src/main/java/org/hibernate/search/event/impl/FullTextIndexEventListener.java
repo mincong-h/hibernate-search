@@ -40,6 +40,7 @@ import org.hibernate.search.backend.spi.WorkType;
 import org.hibernate.search.engine.integration.impl.ExtendedSearchIntegrator;
 import org.hibernate.search.engine.spi.AbstractDocumentBuilder;
 import org.hibernate.search.engine.spi.EntityIndexBinding;
+import org.hibernate.search.spi.IndexedTypeIdentifier;
 import org.hibernate.search.spi.IndexingMode;
 import org.hibernate.search.util.impl.Maps;
 import org.hibernate.search.util.logging.impl.Log;
@@ -81,7 +82,7 @@ public final class FullTextIndexEventListener implements PostDeleteEventListener
 			// but we should not move the responsibility to figure out the proper id to the engine
 			boolean identifierRollbackEnabled = event.getSession()
 					.getFactory()
-					.getSettings()
+					.getSessionFactoryOptions()
 					.isIdentifierRollbackEnabled();
 			processWork( tenantIdentifier( event ), entity, event.getId(), WorkType.DELETE, event, identifierRollbackEnabled );
 		}
@@ -236,11 +237,6 @@ public final class FullTextIndexEventListener implements PostDeleteEventListener
 		PersistentCollection persistentCollection = event.getCollection();
 		final String collectionRole;
 		if ( persistentCollection != null ) {
-			if ( !persistentCollection.wasInitialized() ) {
-				// non-initialized collections will still trigger events, but we want to skip them
-				// as they won't contain new values affecting the index state
-				return;
-			}
 			collectionRole = persistentCollection.getRole();
 		}
 		else {
@@ -280,12 +276,13 @@ public final class FullTextIndexEventListener implements PostDeleteEventListener
 	protected AbstractDocumentBuilder getDocumentBuilder(final Object instance) {
 		ExtendedSearchIntegrator integrator = getExtendedSearchFactoryIntegrator();
 		Class<?> clazz = instance.getClass();
-		EntityIndexBinding entityIndexBinding = integrator.getIndexBinding( clazz );
+		IndexedTypeIdentifier type = integrator.getIndexBindings().keyFromPojoType( clazz );
+		EntityIndexBinding entityIndexBinding = integrator.getIndexBinding( type );
 		if ( entityIndexBinding != null ) {
 			return entityIndexBinding.getDocumentBuilder();
 		}
 		else {
-			return integrator.getDocumentBuilderContainedEntity( clazz );
+			return integrator.getDocumentBuilderContainedEntity( type );
 		}
 	}
 

@@ -15,7 +15,6 @@ import java.util.List;
 import java.util.Random;
 
 import org.apache.lucene.search.ConstantScoreQuery;
-import org.apache.lucene.search.QueryWrapperFilter;
 import org.hibernate.Session;
 import org.hibernate.SessionFactory;
 import org.hibernate.Transaction;
@@ -74,7 +73,7 @@ public final class BenchWithGeonames {
 			sessionFactory = new Configuration().configure( hibernateConfigurationFile ).buildSessionFactory();
 
 			session = sessionFactory.openSession();
-			session.createSQLQuery( "delete from MemberLevelTestPoI" ).executeUpdate();
+			session.createNativeQuery( "delete from MemberLevelTestPoI" ).executeUpdate();
 			session.beginTransaction();
 			fullTextSession = Search.getFullTextSession( session );
 
@@ -220,7 +219,7 @@ public final class BenchWithGeonames {
 						.createQuery();
 				org.apache.lucene.search.Query filteredQuery = new ConstantScoreQuery(
 						SpatialQueryBuilderFromCoordinates.buildDistanceQuery(
-								new QueryWrapperFilter( query ),
+								query,
 								center,
 								radius,
 								"location"

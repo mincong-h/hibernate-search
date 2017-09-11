@@ -9,6 +9,7 @@ package org.hibernate.search.test.sorting;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Set;
 
 import org.apache.lucene.index.IndexReader;
 import org.apache.lucene.search.Sort;
@@ -24,6 +25,8 @@ import org.hibernate.search.indexes.spi.IndexManager;
 import org.hibernate.search.query.engine.impl.SortConfigurations;
 import org.hibernate.search.reader.impl.ManagedMultiReader;
 import org.hibernate.search.reader.impl.MultiReaderFactory;
+import org.hibernate.search.spi.IndexedTypeIdentifier;
+import org.hibernate.search.spi.impl.PojoIndexedTypeIdentifier;
 import org.hibernate.search.testsupport.junit.SearchFactoryHolder;
 import org.hibernate.search.testsupport.junit.SkipOnElasticsearch;
 import org.junit.Rule;
@@ -40,15 +43,18 @@ import static org.fest.assertions.Assertions.assertThat;
 @Category(SkipOnElasticsearch.class) // This test is specific to Lucene
 public class ManagedMultiReaderTest {
 
+	private static final IndexedTypeIdentifier PERSON_TYPE = new PojoIndexedTypeIdentifier( Person.class );
+	private static final IndexedTypeIdentifier CUSTOMER_TYPE = new PojoIndexedTypeIdentifier( Customer.class );
+
 	@Rule
 	public SearchFactoryHolder factoryHolder = new SearchFactoryHolder( Person.class, Customer.class );
 
 	@Test
 	public void testStandardReaderIsUsedIfAllSortsAreCovered() throws Exception {
 		ExtendedSearchIntegrator integrator = factoryHolder.getSearchFactory();
-		EntityIndexBinding binding = integrator.getIndexBinding( Person.class );
+		EntityIndexBinding binding = integrator.getIndexBinding( PERSON_TYPE );
 
-		IndexManager[] indexManagers = binding.getSelectionStrategy().getIndexManagersForQuery( new FullTextFilterImpl[0] );
+		Set<IndexManager> indexManagers = binding.getIndexManagerSelector().forFilters( new FullTextFilterImpl[0] );
 
 		Sort sort = new Sort(
 				new SortField( "ageForIntSorting", Type.INT ),
@@ -57,7 +63,7 @@ public class ManagedMultiReaderTest {
 
 		SortConfigurations configuredSorts = new SortConfigurations.Builder()
 			.setIndex( "test" )
-			.setEntityType( Person.class )
+			.setEntityType( PERSON_TYPE )
 			.addSortableFields(
 					Arrays.asList(
 							new SortableFieldMetadata.Builder( "ageForIntSorting" ).build(),
@@ -66,8 +72,9 @@ public class ManagedMultiReaderTest {
 			)
 			.build();
 
+		IndexManager[] indexManagersArray = indexManagers.toArray( new IndexManager[indexManagers.size()] );
 
-		try ( ManagedMultiReader reader = (ManagedMultiReader) MultiReaderFactory.openReader( configuredSorts, sort, indexManagers, false ) ) {
+		try ( ManagedMultiReader reader = (ManagedMultiReader) MultiReaderFactory.openReader( configuredSorts, sort, indexManagersArray, false ) ) {
 			List<? extends IndexReader> actualReaders = reader.getSubReaders();
 			assertThat( actualReaders ).hasSize( 1 );
 			assertThat( actualReaders.get( 0 ).getClass().getSimpleName() ).isEqualTo( "StandardDirectoryReader" );
@@ -77,9 +84,9 @@ public class ManagedMultiReaderTest {
 	@Test
 	public void testUninvertingReaderIsUsedIfNotAllSortsAreCovered() throws Exception {
 		ExtendedSearchIntegrator integrator = factoryHolder.getSearchFactory();
-		EntityIndexBinding binding = integrator.getIndexBinding( Person.class );
+		EntityIndexBinding binding = integrator.getIndexBinding( PERSON_TYPE );
 
-		IndexManager[] indexManagers = binding.getSelectionStrategy().getIndexManagersForQuery( new FullTextFilterImpl[0] );
+		Set<IndexManager> indexManagers = binding.getIndexManagerSelector().forFilters( new FullTextFilterImpl[0] );
 
 		Sort sort = new Sort(
 				new SortField( "ageForIntSorting", Type.INT ),
@@ -88,7 +95,7 @@ public class ManagedMultiReaderTest {
 
 		SortConfigurations configuredSorts = new SortConfigurations.Builder()
 			.setIndex( "person" )
-			.setEntityType( Person.class )
+			.setEntityType( PERSON_TYPE )
 			.addSortableFields(
 					Arrays.asList(
 							new SortableFieldMetadata.Builder( "ageForStringSorting" ).build()
@@ -96,7 +103,9 @@ public class ManagedMultiReaderTest {
 			)
 			.build();
 
-		try ( ManagedMultiReader reader = (ManagedMultiReader) MultiReaderFactory.openReader( configuredSorts, sort, indexManagers, true ) ) {
+		IndexManager[] indexManagersArray = indexManagers.toArray( new IndexManager[indexManagers.size()] );
+
+		try ( ManagedMultiReader reader = (ManagedMultiReader) MultiReaderFactory.openReader( configuredSorts, sort, indexManagersArray, true ) ) {
 			List<? extends IndexReader> actualReaders = reader.getSubReaders();
 			assertThat( actualReaders ).hasSize( 1 );
 			assertThat( actualReaders.get( 0 ).getClass().getSimpleName() ).isEqualTo( "UninvertingDirectoryReader" );
@@ -107,11 +116,11 @@ public class ManagedMultiReaderTest {
 	public void testCombinationOfStandardAndUninvertingReaderAsRequiredToSortOnInvolvedIndexes() throws Exception {
 		ExtendedSearchIntegrator integrator = factoryHolder.getSearchFactory();
 
-		EntityIndexBinding binding = integrator.getIndexBinding( Person.class );
-		List<IndexManager> indexManagers = new ArrayList<>( Arrays.asList( binding.getSelectionStrategy().getIndexManagersForQuery( new FullTextFilterImpl[0] ) ) );
+		EntityIndexBinding binding = integrator.getIndexBinding( PERSON_TYPE );
+		List<IndexManager> indexManagers = new ArrayList<>( binding.getIndexManagerSelector().forFilters( new FullTextFilterImpl[0] ) );
 
-		binding = integrator.getIndexBinding( Customer.class );
-		indexManagers.addAll( Arrays.asList( binding.getSelectionStrategy().getIndexManagersForQuery( new FullTextFilterImpl[0] ) ) );
+		binding = integrator.getIndexBinding( CUSTOMER_TYPE );
+		indexManagers.addAll( binding.getIndexManagerSelector().forFilters( new FullTextFilterImpl[0] ) );
 
 		Sort sort = new Sort(
 				new SortField( "ageForIntSorting", Type.INT ),
@@ -120,12 +129,12 @@ public class ManagedMultiReaderTest {
 
 		SortConfigurations configuredSorts = new SortConfigurations.Builder()
 			.setIndex( "person" )
-				.setEntityType( Person.class )
+				.setEntityType( PERSON_TYPE )
 					.addSortableFields(
 							Arrays.asList( new SortableFieldMetadata.Builder( "ageForStringSorting" ).build() )
 					)
 			.setIndex( "customer" )
-				.setEntityType( Customer.class )
+				.setEntityType( CUSTOMER_TYPE )
 					.addSortableFields(
 							Arrays.asList(
 									new SortableFieldMetadata.Builder( "ageForStringSorting" ).build(),

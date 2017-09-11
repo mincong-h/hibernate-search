@@ -24,6 +24,22 @@ public final class Closeables {
 	}
 
 	/**
+	 * Close multiple resources, ensuring that all resources get closed
+	 * even if one of them throws a Throwable.
+	 * <p>
+	 * The first caught throwable will be re-thrown, and any additional
+	 * throwable will be {@link Throwable#addSuppressed(Throwable) suppressed}.
+	 *
+	 * @param closeables The resources to close
+	 * @throws E if a closeable throws such an exception
+	 */
+	public static <E extends Exception> void close(Iterable<? extends GenericCloseable<? extends E>> closeables) throws E {
+		try ( Closer<E> closer = new Closer<>() ) {
+			closer.pushAll( GenericCloseable::close, closeables );
+		}
+	}
+
+	/**
 	 * Close a resource without throwing an exception.
 	 *
 	 * @param resource the resource to close
