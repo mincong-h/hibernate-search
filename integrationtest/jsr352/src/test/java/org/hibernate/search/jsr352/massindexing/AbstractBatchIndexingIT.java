@@ -26,6 +26,7 @@ import org.hibernate.search.jsr352.massindexing.test.entity.Person;
 import org.hibernate.search.jsr352.massindexing.test.entity.WhoAmI;
 import org.hibernate.search.jsr352.test.util.PersistenceUnitTestUtil;
 import org.hibernate.search.util.logging.impl.LoggerFactory;
+
 import java.lang.invoke.MethodHandles;
 
 import org.junit.After;
@@ -53,7 +54,7 @@ public abstract class AbstractBatchIndexingIT {
 		List<Company> companies = new ArrayList();
 		List<Person> people = new ArrayList();
 		List<WhoAmI> whos = new ArrayList();
-		for ( int i = 0 ; i < INSTANCE_PER_ENTITY_TYPE; i += 3 ) {
+		for ( int i = 0; i < INSTANCE_PER_ENTITY_TYPE; i += 3 ) {
 			int index1 = i;
 			int index2 = i + 1;
 			int index3 = i + 2;
@@ -73,23 +74,14 @@ public abstract class AbstractBatchIndexingIT {
 			emf = Persistence.createEntityManagerFactory( getPersistenceUnitName() );
 			em = emf.createEntityManager();
 			em.getTransaction().begin();
-			for ( Company c : companies ) {
-				em.persist( c );
-			}
-			for ( Person p : people ) {
-				em.persist( p );
-			}
-			for ( WhoAmI w : whos ) {
-				em.persist( w );
-			}
+			companies.forEach( em::persist );
+			people.forEach( em::persist );
+			whos.forEach( em::persist );
 			em.getTransaction().commit();
 		}
 		finally {
-			try {
+			if ( em != null ) {
 				em.close();
-			}
-			catch (Exception e) {
-				log.error( e );
 			}
 		}
 	}
@@ -109,7 +101,7 @@ public abstract class AbstractBatchIndexingIT {
 			em = emf.createEntityManager();
 			em.getTransaction().begin();
 			CriteriaBuilder criteriaBuilder = em.getCriteriaBuilder();
-			CriteriaQuery<Company> criteria = criteriaBuilder.createQuery( Company.class);
+			CriteriaQuery<Company> criteria = criteriaBuilder.createQuery( Company.class );
 			Root<Company> root = criteria.from( Company.class );
 			Path<Integer> id = root.get( root.getModel().getId( int.class ) );
 			criteria.orderBy( criteriaBuilder.asc( id ) );
